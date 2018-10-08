@@ -1,0 +1,18 @@
+package: github.com/tef-novum/secrets-manager
+import:
+- package: k8s.io/client-go
+  version: kubernetes-1.10.0
+- package: k8s.io/apimachinery
+  version: kubernetes-1.10.0
+- package: k8s.io/api
+  version: kubernetes-1.10.0
+- package: github.com/stretchr/testify
+  version: v1.2.2
+- package: github.com/sirupsen/logrus
+  version: v1.0.6
+- package: github.com/hashicorp/vault
+  version: v0.11.1
+- package: github.com/gorilla/mux
+  version: ^1.6.2
+- package: github.com/golang/mock/gomock
+  version: v1.1.1
