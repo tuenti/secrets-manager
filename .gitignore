@@ -1,0 +1,7 @@
+app
+vendor/
+build/
+mocks/
+
+# IDE related
+.vscode/
