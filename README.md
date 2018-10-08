@@ -1,5 +1,7 @@
-# secrets-manager
-A simple tool to map Vault secrets to Kubernetes secrets
+# secrets-manager 
+[![Go Report Card](https://goreportcard.com/badge/github.com/tuenti/secrets-manager)](https://goreportcard.com/report/github.com/tuenti/secrets-manager)
+
+A tool to keep your Kubernetes secrets in sync with Vault
 
 # Rationale
 

@@ -34,6 +34,11 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 	httpClient := new(http.Client)
 	vclient, err := api.NewClient(&api.Config{Address: cfg.VaultURL, HttpClient: httpClient})
 
+	if err != nil {
+		logger.Debugf("unable to build vault client: %v", err)
+		return nil, err
+	}
+
 	vclient.SetToken(cfg.VaultToken)
 	sys := vclient.Sys()
 	health, err := sys.Health()

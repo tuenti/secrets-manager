@@ -130,7 +130,9 @@ func main() {
 		select {
 		case <-sigc:
 			cancel()
+			break
 		}
+		break
 	}
 	wg.Wait()
 }

@@ -40,7 +40,7 @@ func TestGetTextDecoderFromEmptyString(t *testing.T) {
 
 func TestDecodeB64String(t *testing.T) {
 	b64data := "dGVzdGluZyBiYXNlNjQgZGVjb2RpbmcK"
-	decoder, err := NewDecoder("base64")
+	decoder, _ := NewDecoder("base64")
 	data, err := decoder.DecodeString(b64data)
 	assert.Nil(t, err)
 	assert.Equal(t, "testing base64 decoding", fmt.Sprintf("%s", data))
@@ -48,7 +48,7 @@ func TestDecodeB64String(t *testing.T) {
 
 func TestDecodeInvalidB64String(t *testing.T) {
 	b64data := "Invalid b64 data"
-	decoder, err := NewDecoder("base64")
+	decoder, _ := NewDecoder("base64")
 	data, err := decoder.DecodeString(b64data)
 	assert.NotNil(t, err)
 	assert.Nil(t, data)
@@ -56,7 +56,7 @@ func TestDecodeInvalidB64String(t *testing.T) {
 
 func TestDecodeText(t *testing.T) {
 	text := "secret text"
-	decoder, err := NewDecoder("text")
+	decoder, _ := NewDecoder("text")
 	data, err := decoder.DecodeString(text)
 	assert.Nil(t, err)
 	assert.Equal(t, text, fmt.Sprintf("%s", data))
