@@ -10,6 +10,11 @@ BUILD_FLAGS=-ldflags "-X main.version=${SECRETS_MANAGER_VERSION}"
 
 pkgs   = $(shell go list ./... | grep -v /vendor/)
 
+.PHONY: init
+init:
+	scripts/setup-dev-env.sh
+	glide install
+
 .PHONY: build-linux
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${BUILD_FLAGS} -o ${BUILD_FOLDER}/${BINARY_NAME} -v
@@ -26,9 +31,9 @@ docker-push: docker-build
 .PHONY: test
 test: mocks
 	mkdir -p ${BUILD_FOLDER}
-	go test -coverprofile=${BUILD_FOLDER}/c.out ./... 
-	go tool cover -html=${BUILD_FOLDER}/c.out -o ${BUILD_FOLDER}/coverage.html
-	go tool cover -func=${BUILD_FOLDER}/c.out
+	go test -coverprofile=${BUILD_FOLDER}/coverage.txt ./... 
+	go tool cover -html=${BUILD_FOLDER}/coverage.txt -o ${BUILD_FOLDER}/coverage.html
+	go tool cover -func=${BUILD_FOLDER}/coverage.txt
 
 .PHONY: style
 style:
