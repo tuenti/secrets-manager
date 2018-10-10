@@ -1,5 +1,7 @@
 # secrets-manager 
+[![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/circleci.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/circleci)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tuenti/secrets-manager)](https://goreportcard.com/report/github.com/tuenti/secrets-manager)
+[![codecov](https://codecov.io/gh/tuenti/secrets-manager/branch/circleci/graph/badge.svg)](https://codecov.io/gh/tuenti/secrets-manager)
 
 A tool to keep your Kubernetes secrets in sync with Vault
 
