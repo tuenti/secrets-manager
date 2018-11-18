@@ -138,7 +138,6 @@ And then generate a token associated to that role
 
 ## Deployment
 *secrets-manager* has been designed to be deployed in Kubernetes as it reads its config file from Kubernetes Configmap. Future versions of *secrets-manager* may use Custom Resource Definitions instead.
-You will find a full deployment example in the `docs` folder.
 
 ## Credits & Contact
 
