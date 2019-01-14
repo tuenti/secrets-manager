@@ -9,11 +9,24 @@ import (
 	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/errors"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var logger *log.Logger
 
 const defaultSecretKey = "data"
+
+var (
+	tokenExpired = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "secrets_manager",
+		Subsystem: "vault",
+		Name:      "token_expired",
+		Help:      "The state of the token: 1 = expired; 0 = still valid",
+	},
+		[]string{}, // no labels
+	)
+)
 
 type client struct {
 	vclient            *api.Client
@@ -22,6 +35,10 @@ type client struct {
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
+}
+
+func init() {
+	prometheus.MustRegister(tokenExpired)
 }
 
 func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error) {
@@ -101,6 +118,13 @@ func (c *client) isTokenExpired() bool {
 			exp = true
 			return exp
 		}
+	}
+
+	// Update Prometheus Metrics
+	if exp {
+		tokenExpired.WithLabelValues().Set(1)
+	} else {
+		tokenExpired.WithLabelValues().Set(0)
 	}
 
 	return exp

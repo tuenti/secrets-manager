@@ -9,6 +9,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"net/http"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/backend"
@@ -17,6 +18,8 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // To be filled from build ldflags
@@ -45,6 +48,7 @@ func main() {
 	logLevel := flag.String("log.level", "warn", "Minimum log level")
 	logFormat := flag.String("log.format", "text", "Log format, one of text or json")
 	versionFlag := flag.Bool("version", false, "Display Secret Manager version")
+	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 
 	flag.StringVar(&secretsManagerCfg.ConfigMap, "config.config-map", "secrets-manager-config", "Name of the config Map with Secrets Manager settings (format: [<namespace>/]<name>) ")
 	flag.DurationVar(&secretsManagerCfg.BackendScrapeInterval, "config.backend-scrape-interval", 15*time.Second, "Scraping secrets from backend interval")
@@ -126,13 +130,42 @@ func main() {
 	wg.Add(1)
 	go secretsManager.Start(ctx)
 
+	srv := startHttpServer(*addr, logger)
+
 	for {
 		select {
 		case <-sigc:
+			shutdownHttpServer(srv, logger)
 			cancel()
 			break
 		}
 		break
 	}
 	wg.Wait()
+}
+
+func shutdownHttpServer(srv *http.Server, logger *log.Logger) {
+	logger.Infof("[main] Stopping HTTP server")
+
+    if err := srv.Shutdown(nil); err != nil {
+        logger.Errorf("ListenAndServe(): %s", err)
+    } else {
+		logger.Infof("[main] Stopped HTTP server")
+	}
+}
+
+func startHttpServer(addr string, logger *log.Logger) *http.Server {
+    srv := &http.Server{Addr: addr}
+
+    http.Handle("/metrics", promhttp.Handler())
+
+    go func() {
+		logger.Infof("Starting HTTP server listening on %v", addr)
+        // returns ErrServerClosed on graceful close
+        if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+            logger.Errorf("[main] Unexpected error in HTTP server: %s", err)
+        }
+    }()
+
+    return srv
 }
