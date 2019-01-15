@@ -202,6 +202,8 @@ func TestTokenNotExpired(t *testing.T) {
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 600
 	client.maxTokenTTL = 60
+	assert.Equal(t, 600.0, tokenTTL)
+	assert.Equal(t, 0.0, tokenExpired)
 	assert.False(t, client.isTokenExpired())
 }
 
@@ -212,6 +214,8 @@ func TestTokenExpired(t *testing.T) {
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 10
 	client.maxTokenTTL = 50
+	assert.Equal(t, 10.0, tokenTTL)
+	assert.Equal(t, 1.0, tokenExpired)
 	assert.True(t, client.isTokenExpired())
 }
 
@@ -220,6 +224,7 @@ func TestTokenNotRenewableExpired(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
+	assert.Equal(t, 0.0, tokenExpired)
 	assert.False(t, client.isTokenExpired())
 }
 
@@ -227,6 +232,7 @@ func TestRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	err := client.renewToken()
 	assert.Nil(t, err)
+	assert.Equal(t, 0.0, tokenExpired)
 }
 
 func TestReadSecretKv2(t *testing.T) {
