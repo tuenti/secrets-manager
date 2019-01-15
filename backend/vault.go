@@ -18,14 +18,22 @@ var logger *log.Logger
 const defaultSecretKey = "data"
 
 var (
+	vaultLabelNames = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
+	vaultLabels     = make(map[string]string, len(vaultLabelNames))
+
+	// Prometeheus metrics: https://prometheus.io
 	tokenExpired = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "token_expired",
 		Help:      "The state of the token: 1 = expired; 0 = still valid",
-	},
-		[]string{}, // no labels
-	)
+	}, vaultLabelNames)
+	tokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "secrets_manager",
+		Subsystem: "vault",
+		Name:      "token_ttl",
+		Help:      "Vault token TTL",
+	}, vaultLabelNames)
 )
 
 type client struct {
@@ -39,6 +47,7 @@ type client struct {
 
 func init() {
 	prometheus.MustRegister(tokenExpired)
+	prometheus.MustRegister(tokenTTL)
 }
 
 func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error) {
@@ -73,6 +82,12 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 		logger.Debugf("unable to use engine %s: %v", cfg.VaultEngine, err)
 		return nil, err
 	}
+
+	vaultLabels["vault_address"] = cfg.VaultURL
+	vaultLabels["vault_engine"] = cfg.VaultEngine
+	vaultLabels["vault_version"] = health.Version
+	vaultLabels["vault_cluster_id"] = health.ClusterID
+	vaultLabels["vault_cluster_name"] = health.ClusterName
 
 	client := client{
 		vclient:            vclient,
@@ -113,6 +128,14 @@ func (c *client) isTokenExpired() bool {
 			exp = true
 			return exp
 		}
+
+		tokenTTL.WithLabelValues(
+			vaultLabels["vault_address"],
+			vaultLabels["vault_engine"],
+			vaultLabels["vault_version"],
+			vaultLabels["vault_cluster_id"],
+			vaultLabels["vault_cluster_name"]).Set(float64(ttl))
+
 		if ttl < c.maxTokenTTL {
 			logger.Warnf("token is really close to expire, current ttl: %d", ttl)
 			exp = true
@@ -120,11 +143,21 @@ func (c *client) isTokenExpired() bool {
 		}
 	}
 
-	// Update Prometheus Metrics
+	// Update tokenExpired metric
 	if exp {
-		tokenExpired.WithLabelValues().Set(1)
+		tokenExpired.WithLabelValues(
+			vaultLabels["vault_address"],
+			vaultLabels["vault_engine"],
+			vaultLabels["vault_version"],
+			vaultLabels["vault_cluster_id"],
+			vaultLabels["vault_cluster_name"]).Set(1)
 	} else {
-		tokenExpired.WithLabelValues().Set(0)
+		tokenExpired.WithLabelValues(
+			vaultLabels["vault_address"],
+			vaultLabels["vault_engine"],
+			vaultLabels["vault_version"],
+			vaultLabels["vault_cluster_id"],
+			vaultLabels["vault_cluster_name"]).Set(0)
 	}
 
 	return exp
