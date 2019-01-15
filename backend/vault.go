@@ -9,32 +9,14 @@ import (
 	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/errors"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
-
-var logger *log.Logger
-
-const defaultSecretKey = "data"
 
 var (
-	vaultLabelNames = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
-	vaultLabels     = make(map[string]string, len(vaultLabelNames))
-
-	// Prometeheus metrics: https://prometheus.io
-	tokenExpired = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "secrets_manager",
-		Subsystem: "vault",
-		Name:      "token_expired",
-		Help:      "The state of the token: 1 = expired; 0 = still valid",
-	}, vaultLabelNames)
-	tokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "secrets_manager",
-		Subsystem: "vault",
-		Name:      "token_ttl",
-		Help:      "Vault token TTL",
-	}, vaultLabelNames)
+	logger  *log.Logger
+	metrics *vaultMetrics
 )
+
+const defaultSecretKey = "data"
 
 type client struct {
 	vclient            *api.Client
@@ -43,11 +25,6 @@ type client struct {
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
-}
-
-func init() {
-	prometheus.MustRegister(tokenExpired)
-	prometheus.MustRegister(tokenTTL)
 }
 
 func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error) {
@@ -83,11 +60,7 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 		return nil, err
 	}
 
-	vaultLabels["vault_address"] = cfg.VaultURL
-	vaultLabels["vault_engine"] = cfg.VaultEngine
-	vaultLabels["vault_version"] = health.Version
-	vaultLabels["vault_cluster_id"] = health.ClusterID
-	vaultLabels["vault_cluster_name"] = health.ClusterName
+	metrics = newVaultMetrics(cfg.VaultURL, health.Version, cfg.VaultEngine, health.ClusterID, health.ClusterName)
 
 	client := client{
 		vclient:            vclient,
@@ -109,6 +82,7 @@ func (c *client) isTokenExpired() bool {
 	lookup, err := auth.Token().LookupSelf()
 	if err != nil {
 		logger.Errorf("error checking token with lookup self api: %v", err)
+		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 		exp = true
 		return exp
 	}
@@ -117,6 +91,7 @@ func (c *client) isTokenExpired() bool {
 
 	if err != nil {
 		logger.Errorf("could not check token renewability: %v", err)
+		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 		exp = true
 		return exp
 	}
@@ -125,39 +100,21 @@ func (c *client) isTokenExpired() bool {
 		ttl, err = lookup.Data["ttl"].(json.Number).Int64()
 		if err != nil {
 			logger.Errorf("couldn't decode ttl from token: %v", err)
+			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 			exp = true
 			return exp
 		}
 
-		tokenTTL.WithLabelValues(
-			vaultLabels["vault_address"],
-			vaultLabels["vault_engine"],
-			vaultLabels["vault_version"],
-			vaultLabels["vault_cluster_id"],
-			vaultLabels["vault_cluster_name"]).Set(float64(ttl))
+		metrics.updateVaultTokenTTLMetric(ttl)
 
 		if ttl < c.maxTokenTTL {
 			logger.Warnf("token is really close to expire, current ttl: %d", ttl)
+			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 			exp = true
 			return exp
+		} else {
+			metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
 		}
-	}
-
-	// Update tokenExpired metric
-	if exp {
-		tokenExpired.WithLabelValues(
-			vaultLabels["vault_address"],
-			vaultLabels["vault_engine"],
-			vaultLabels["vault_version"],
-			vaultLabels["vault_cluster_id"],
-			vaultLabels["vault_cluster_name"]).Set(1)
-	} else {
-		tokenExpired.WithLabelValues(
-			vaultLabels["vault_address"],
-			vaultLabels["vault_engine"],
-			vaultLabels["vault_version"],
-			vaultLabels["vault_cluster_id"],
-			vaultLabels["vault_cluster_name"]).Set(0)
 	}
 
 	return exp
@@ -208,16 +165,20 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 		if secretData != nil {
 			if secretData[key] != nil {
 				data = secretData[key].(string)
+				metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretFound)
 			} else {
+				metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
 				err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 			}
 		} else {
 			for _, w := range warnings {
 				logger.Warningln(w)
 			}
+			metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
 			err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 		}
 	} else {
+		metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
 		err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 	}
 	return data, err
