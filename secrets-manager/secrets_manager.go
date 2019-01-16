@@ -127,12 +127,16 @@ func (s *SecretManager) syncState(secret SecretDefinition) error {
 	desiredState, err := s.getDesiredState(secret)
 	if err != nil {
 		logger.Errorf("unable to get desired state for secret '%s' : %v", secret.Name, err)
+		for _, namespace := range secret.Namespaces {
+			secretUpdated.WithLabelValues(secret.Name, namespace).Set(0)
+		}
 		return err
 	}
 	for _, namespace := range secret.Namespaces {
 		currentState, err := s.getCurrentState(namespace, secret.Name)
 		if err != nil && !errors.IsK8sSecretNotFound(err) {
 			logger.Errorf("unable to get current state of secret '%s/%s' : %v", namespace, secret.Name, err)
+			secretUpdated.WithLabelValues(secret.Name, namespace).Set(0)
 			// If we fail to read from Kubernetes, we keep trying with another namespace
 			continue
 		}
@@ -141,21 +145,24 @@ func (s *SecretManager) syncState(secret SecretDefinition) error {
 			logger.Infof("secret '%s/%s' must be updated", namespace, secret.Name)
 			if err := s.upsertSecret(secret.Type, namespace, secret.Name, desiredState); err != nil {
 				log.Errorf("unable to upsert secret %s/%s: %v", namespace, secret.Name, err)
+				secretUpdated.WithLabelValues(secret.Name, namespace).Set(0)
 				continue
 			}
 			logger.Infof("secret '%s/%s' updated", namespace, secret.Name)
+			secretUpdated.WithLabelValues(secret.Name, namespace).Set(1)
 		}
 	}
 	return nil
 }
 
 func (s *SecretManager) upsertSecret(secretType string, namespace string, name string, data map[string][]byte) error {
+	lastUpdate := time.Now()
 	secret := &k8s.Secret{
 		Type: secretType,
 		Name: name,
 		Labels: map[string]string{
 			"managedBy":  "secrets-manager",
-			"lastUpdate": time.Now().Format(timestampFormat),
+			"lastUpdate": lastUpdate.Format(timestampFormat),
 		},
 		Namespace: namespace,
 		Data:      data,
@@ -165,6 +172,7 @@ func (s *SecretManager) upsertSecret(secretType string, namespace string, name s
 		log.Errorf("unable to upsert secret %s/%s: %v", namespace, name, err)
 		return err
 	}
+	secretLastUpdated.WithLabelValues(name, namespace).Set(float64(lastUpdate.Unix()))
 	return nil
 }
 
