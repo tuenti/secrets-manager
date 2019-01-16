@@ -17,6 +17,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type fakeBackendSecret struct {
@@ -318,6 +320,9 @@ func TestSyncState(t *testing.T) {
 	})
 
 	assert.Nil(t, err)
+	// Test Prometheus metric
+	metricSecretUpdate, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretUpdate))
 }
 
 func TestSyncStateErrorGetDesired(t *testing.T) {
@@ -344,6 +349,9 @@ func TestSyncStateErrorGetDesired(t *testing.T) {
 	})
 
 	assert.NotNil(t, err)
+	// Test Prometheus Metric
+	metricSecretUpdate, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdate))
 }
 
 func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
@@ -398,6 +406,60 @@ func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
 	})
 
 	assert.Nil(t, err)
+	// Test Prometheus Metric
+	metricSecretUpdate1, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns1")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretUpdate1))
+	metricSecretUpdate2, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns2")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdate2))
+	metricSecretUpdate3, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns3")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretUpdate3))
+}
+
+func TestSyncStateErrorUpsertSecret(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	k8s := mocks.NewMockKubernetesClient(mockCtrl)
+
+	fakeCurrentSecretData := map[string][]byte{
+		"value1": []byte("fake-current-data"),
+	}
+
+	expectedSecret1 := &kubernetes.Secret{
+		Name:      "secret-name",
+		Namespace: "ns1",
+		Data: map[string][]byte{
+			"value1": []byte("fake-content"),
+		},
+	}
+
+
+	k8s.EXPECT().ReadSecret("ns1", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
+	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret1)).Times(1).Return(errors.New("some error"))
+
+	ctx := context.Background()
+	fakeBackend := newFakeBackend([]fakeBackendSecret{
+		{"some/path", "key-in-vault", "fake-content"},
+	})
+	logger := log.New()
+	cfg := Config{ConfigMap: "cm"}
+	secretManager, _ := New(ctx, cfg, k8s, fakeBackend, logger)
+
+	err := secretManager.syncState(SecretDefinition{
+		Name:       "secret-name",
+		Namespaces: []string{"ns1"},
+		Type:       "Opaque",
+		Data: map[string]Datasource{
+			"value1": {
+				Path: "some/path",
+				Key:  "key-in-vault",
+			},
+		},
+	})
+
+	assert.Nil(t, err)
+	// Test Prometheus Metric
+	metricSecretUpdate1, _ := secretUpdated.GetMetricWithLabelValues("secret-name", "ns1")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdate1))
 }
 
 func TestLoadConfig(t *testing.T) {
