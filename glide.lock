@@ -1,5 +1,5 @@
-hash: c37ca61c967026fe32213bc30ccd3c8c1d50dd5ab7a4d3678959a84f37b149cc
-updated: 2019-01-14T16:37:29.257726497+01:00
+hash: 7b121090bc2b6e2e382995e1dfdfa301141e6c06328f4ac88cf91227e01c4447
+updated: 2019-01-15T15:07:40.793657934+01:00
 imports:
 - name: github.com/beorn7/perks
   version: 3a771d992973f24aa725d07868b467d1ddfceafb
@@ -15,7 +15,7 @@ imports:
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/mock
-  version: c34cdb4725f4c3844d095133c6e40e448b86589b
+  version: 51421b967af1f557f93a59e0057aaf15ca02e29c
   subpackages:
   - gomock
 - name: github.com/golang/protobuf

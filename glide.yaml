@@ -15,7 +15,7 @@ import:
 - package: github.com/gorilla/mux
   version: ^1.6.2
 - package: github.com/golang/mock
-  version: v1.1.1
+  version: v1.2.0
   subpackages:
   - gomock
 - package: github.com/prometheus/client_golang
