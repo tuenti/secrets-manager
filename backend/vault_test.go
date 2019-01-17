@@ -207,6 +207,8 @@ func TestTokenNotExpired(t *testing.T) {
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 600
 	client.maxTokenTTL = 6
+	tokenTTL.Reset()
+	tokenExpired.Reset()
 	exp := client.isTokenExpired()
 	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
@@ -222,6 +224,8 @@ func TestTokenExpired(t *testing.T) {
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 10
 	client.maxTokenTTL = 50
+	tokenTTL.Reset()
+	tokenExpired.Reset()
 	exp := client.isTokenExpired()
 	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
@@ -235,6 +239,7 @@ func TestTokenNotRenewableExpired(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
+	tokenExpired.Reset()
 	exp := client.isTokenExpired()
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	assert.False(t, exp)
@@ -245,6 +250,7 @@ func TestRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	err := client.renewToken()
 	assert.Nil(t, err)
+	tokenExpired.Reset()
 	exp := client.isTokenExpired()
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	assert.False(t, exp)
@@ -272,6 +278,7 @@ func TestSecretNotFound(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	path := "/secret/data/test"
 	key := "foo2"
+	secretReadErrorsCount.Reset()
 	secretValue, err := client.ReadSecret(path, key)
 	assert.Empty(t, secretValue)
 	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, key, path))
