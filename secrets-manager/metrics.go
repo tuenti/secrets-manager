@@ -1,6 +1,6 @@
 package secretsmanager
 
-import(
+import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 

@@ -437,7 +437,6 @@ func TestSyncStateErrorUpsertSecret(t *testing.T) {
 		},
 	}
 
-
 	k8s.EXPECT().ReadSecret("ns1", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
 	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret1)).Times(1).Return(errors.New("some error"))
 

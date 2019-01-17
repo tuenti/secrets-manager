@@ -1,9 +1,9 @@
 package kubernetes
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"errors"
 
 	secretsManagerErrors "github.com/tuenti/secrets-manager/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -14,8 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/fake"
-	clientgotesting "k8s.io/client-go/testing"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	clientgotesting "k8s.io/client-go/testing"
 
 	log "github.com/sirupsen/logrus"
 

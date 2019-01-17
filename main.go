@@ -4,12 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-	"net/http"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/backend"
@@ -147,25 +147,25 @@ func main() {
 func shutdownHttpServer(srv *http.Server, logger *log.Logger) {
 	logger.Infof("[main] Stopping HTTP server")
 
-    if err := srv.Shutdown(nil); err != nil {
-        logger.Errorf("ListenAndServe(): %s", err)
-    } else {
+	if err := srv.Shutdown(nil); err != nil {
+		logger.Errorf("ListenAndServe(): %s", err)
+	} else {
 		logger.Infof("[main] Stopped HTTP server")
 	}
 }
 
 func startHttpServer(addr string, logger *log.Logger) *http.Server {
-    srv := &http.Server{Addr: addr}
+	srv := &http.Server{Addr: addr}
 
-    http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", promhttp.Handler())
 
-    go func() {
+	go func() {
 		logger.Infof("Starting HTTP server listening on %v", addr)
-        // returns ErrServerClosed on graceful close
-        if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-            logger.Errorf("[main] Unexpected error in HTTP server: %s", err)
-        }
-    }()
+		// returns ErrServerClosed on graceful close
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			logger.Errorf("[main] Unexpected error in HTTP server: %s", err)
+		}
+	}()
 
-    return srv
+	return srv
 }
