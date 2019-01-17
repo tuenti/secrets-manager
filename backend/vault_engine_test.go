@@ -43,22 +43,23 @@ func TestGetDataKv1(t *testing.T) {
 func TestGetDataKv2(t *testing.T) {
 	data := make(map[string]interface{})
 	nested := make(map[string]interface{})
-	nested["foo"] = "bat"
+	nested["foo"] = "bar"
 	data["data"] = nested
 	s := &api.Secret{Data: data}
 	engine, _ := newEngine("kv2")
 	d := engine.getData(s)
 	assert.NotNil(t, d)
-	assert.Equal(t, data, d)
+	assert.Equal(t, nested, d)
 }
 
 func TestGetDataKv2WithKv1Engine(t *testing.T) {
 	data := make(map[string]interface{})
 	nested := make(map[string]interface{})
-	nested["foo"] = "bat"
+	nested["foo"] = "bar"
 	data["data"] = nested
 	s := &api.Secret{Data: data}
 	engine, _ := newEngine("kv1")
 	d := engine.getData(s)
-	assert.Nil(t, d)
+	assert.NotNil(t, d)
+	assert.Equal(t, data, d)
 }

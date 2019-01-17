@@ -5,13 +5,11 @@ import "github.com/prometheus/client_golang/prometheus"
 const (
 	vaultTokenExpired    = 1
 	vaultTokenNotExpired = 0
-	vaultSecretFound     = 0
-	vaultSecretNotFound  = 1
 )
 
 var (
 	vaultLabelNames  = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
-	secretLabelNames = []string{"path", "key"}
+	secretLabelNames = []string{"path", "key", "error"}
 
 	// Prometeheus metrics: https://prometheus.io
 	tokenExpired = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -26,11 +24,11 @@ var (
 		Name:      "token_ttl",
 		Help:      "Vault token TTL",
 	}, vaultLabelNames)
-	secretNotFound = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	secretReadErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
-		Name:      "secret_not_found",
-		Help:      "Whether or not a secret key can be found in a path: 1 = not found; 0 = secret key found in that path",
+		Name:      "read_secret_errors_count",
+		Help:      "Vault read operations counter",
 	}, append(vaultLabelNames, secretLabelNames...))
 )
 
@@ -41,7 +39,7 @@ type vaultMetrics struct {
 func init() {
 	prometheus.MustRegister(tokenExpired)
 	prometheus.MustRegister(tokenTTL)
-	prometheus.MustRegister(secretNotFound)
+	prometheus.MustRegister(secretReadErrorsCount)
 }
 
 func newVaultMetrics(vaultAddr string, vaultVersion string, vaultEngine string, vaultClusterId string, vaultClusterName string) *vaultMetrics {
@@ -78,18 +76,15 @@ func (vm *vaultMetrics) updateVaultTokenTTLMetric(value int64) {
 		vm.vaultLabels["vault_cluster_name"]).Set(float64(value))
 }
 
-func (vm *vaultMetrics) updateVaultSecretNotFoundMetric(path string, key string, value int) {
-	if value != vaultSecretNotFound && value != vaultSecretFound {
-		logger.Errorf("refusing to update secrets_manager_vault_secret_not_found metric with value %d. Allowed values are %d and %d", value, vaultTokenExpired, vaultTokenNotExpired)
-		return
-	}
+func (vm *vaultMetrics) updateVaultSecretReadErrorsCountMetric(path string, key string, errorType string) {
 
-	secretNotFound.WithLabelValues(
+	secretReadErrorsCount.WithLabelValues(
 		vm.vaultLabels["vault_addr"],
 		vm.vaultLabels["vault_engine"],
 		vm.vaultLabels["vault_version"],
 		vm.vaultLabels["vault_cluster_id"],
 		vm.vaultLabels["vault_cluster_name"],
 		path,
-		key).Set(float64(value))
+		key,
+		errorType).Inc()
 }

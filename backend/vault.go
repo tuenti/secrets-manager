@@ -112,9 +112,8 @@ func (c *client) isTokenExpired() bool {
 			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 			exp = true
 			return exp
-		} else {
-			metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
 		}
+		metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
 	}
 
 	return exp
@@ -156,6 +155,7 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 	logical := c.logical
 	secret, err := logical.Read(path)
 	if err != nil {
+		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.UnknownErrorType)
 		return data, err
 	}
 
@@ -165,20 +165,19 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 		if secretData != nil {
 			if secretData[key] != nil {
 				data = secretData[key].(string)
-				metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretFound)
 			} else {
-				metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
+				metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 				err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 			}
 		} else {
 			for _, w := range warnings {
 				logger.Warningln(w)
 			}
-			metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
+			metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 			err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 		}
 	} else {
-		metrics.updateVaultSecretNotFoundMetric(path, key, vaultSecretNotFound)
+		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 		err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 	}
 	return data, err
