@@ -5,9 +5,6 @@ import(
 )
 
 var (
-	vaultLabelNames = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
-	vaultLabels     = make(map[string]string, len(vaultLabelNames))
-
 	// Prometeheus metrics: https://prometheus.io
 	secretUpdated = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
