@@ -1,14 +1,13 @@
-package testutils
+package kubernetes
 
 import (
-	"github.com/tuenti/secrets-manager/kubernetes"
 	"math/rand"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func NewFakeSecret(namespace string, name string) *kubernetes.Secret {
-	return &kubernetes.Secret{
+func NewFakeSecret(namespace string, name string) *Secret {
+	return &Secret{
 		Type:      "Opaque",
 		Name:      name,
 		Namespace: namespace,

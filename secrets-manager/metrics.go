@@ -6,11 +6,11 @@ import(
 
 var (
 	// Prometeheus metrics: https://prometheus.io
-	secretUpdated = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	secretSyncErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "secret",
-		Name:      "updated",
-		Help:      "The up-to-date state of the secret: 1 = succesfulyy updated; 0 = couldn't update it",
+		Name:      "sync_errors_count",
+		Help:      "The count errors when trying to sync a secret from backend into K8s",
 	}, []string{"name", "namespace"})
 
 	secretLastUpdated = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -22,6 +22,6 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(secretUpdated)
+	prometheus.MustRegister(secretSyncErrorsCount)
 	prometheus.MustRegister(secretLastUpdated)
 }
