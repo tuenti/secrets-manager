@@ -1,40 +1,46 @@
-package kubernetes_test
+package kubernetes
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/tuenti/secrets-manager/errors"
-	"github.com/tuenti/secrets-manager/kubernetes"
+	secretsManagerErrors "github.com/tuenti/secrets-manager/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"testing"
 
-	"github.com/tuenti/secrets-manager/testutils"
-
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/fake"
+	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	clientgotesting "k8s.io/client-go/testing"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestUpsertSecretDoesNotExist(t *testing.T) {
+	secretUpdateErrorCount.Reset()
 	client := fake.NewSimpleClientset()
 
-	k8s := kubernetes.New(client, log.New())
+	k8s := New(client, log.New())
 
-	k8sSecret := testutils.NewFakeSecret("ns", "secret-test")
+	k8sSecret := NewFakeSecret("ns", "secret-test")
 
 	k8s.UpsertSecret(k8sSecret)
 
 	secret, _ := client.CoreV1().Secrets("ns").Get("secret-test", metav1.GetOptions{})
 
 	assert.NotNil(t, secret)
+	metricSecretUpdateErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorCount))
 }
 
 func TestUpsertSecretAlreadyExists(t *testing.T) {
+	secretUpdateErrorCount.Reset()
 	// Create the fake client.
 	client := fake.NewSimpleClientset()
 
@@ -43,9 +49,9 @@ func TestUpsertSecretAlreadyExists(t *testing.T) {
 
 	logger.Out = os.Stderr
 
-	k8s := kubernetes.New(client, logger)
+	k8s := New(client, logger)
 
-	k8sSecret := testutils.NewFakeSecret("ns", "secret-test")
+	k8sSecret := NewFakeSecret("ns", "secret-test")
 
 	// Upsert twice, second must be an update
 	k8s.UpsertSecret(k8sSecret)
@@ -54,6 +60,8 @@ func TestUpsertSecretAlreadyExists(t *testing.T) {
 	actions := client.Actions()
 	lastAction := actions[len(actions)-1]
 	assert.Implements(t, (*clientgotesting.UpdateAction)(nil), lastAction, "Last action must be UpdateAction")
+	metricSecretUpdateErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorCount))
 }
 
 func TestReadConfigMap(t *testing.T) {
@@ -66,7 +74,7 @@ func TestReadConfigMap(t *testing.T) {
 
 	logger.Out = os.Stderr
 
-	k8s := kubernetes.New(client, logger)
+	k8s := New(client, logger)
 
 	client.CoreV1().ConfigMaps("default").Create(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,9 +91,10 @@ func TestReadConfigMap(t *testing.T) {
 }
 
 func TestReadSecret(t *testing.T) {
+	secretReadErrorCount.Reset()
 	client := fake.NewSimpleClientset()
 
-	k8s := kubernetes.New(client, log.New())
+	k8s := New(client, log.New())
 
 	data := "some-value"
 
@@ -108,14 +117,35 @@ func TestReadSecret(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, secret)
 	assert.Equal(t, "some-value", string(secret["some-key"]))
+	metricSecretReadErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorCount))
 }
 
 func TestReadSecretNotFound(t *testing.T) {
+	secretReadErrorCount.Reset()
 	client := fake.NewSimpleClientset()
 
-	k8s := kubernetes.New(client, log.New())
+	k8s := New(client, log.New())
 
 	secret, err := k8s.ReadSecret("ns", "secret-test")
-	assert.EqualError(t, err, fmt.Sprintf("[%s] secret '%s/%s' not found", errors.K8sSecretNotFoundErrorType, "ns", "secret-test"))
+	assert.EqualError(t, err, fmt.Sprintf("[%s] secret '%s/%s' not found", secretsManagerErrors.K8sSecretNotFoundErrorType, "ns", "secret-test"))
 	assert.Empty(t, secret)
+	metricSecretReadErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorCount))
+}
+
+func TestReadSecretError(t *testing.T) {
+	secretReadErrorCount.Reset()
+
+	client := fake.NewSimpleClientset()
+	client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("*", "*", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, errors.New("This is an This is an unexpected K8s error")
+	})
+
+	k8s := New(client, log.New())
+	secret, err := k8s.ReadSecret("ns", "secret-test")
+	assert.Empty(t, secret)
+	assert.NotNil(t, err)
+	metricSecretReadErrorCount, _ := secretReadErrorCount.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorCount))
 }

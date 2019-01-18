@@ -35,11 +35,11 @@ func TestGetTextDecoderFromEmptyString(t *testing.T) {
 	decoder, err := NewDecoder(encoding)
 	textDecoder := decoder.(TextDecoder)
 	assert.Nil(t, err)
-	assert.Equal(t, encoding, textDecoder.Encoding)
+	assert.Equal(t, "text", textDecoder.Encoding)
 }
 
 func TestDecodeB64String(t *testing.T) {
-	b64data := "dGVzdGluZyBiYXNlNjQgZGVjb2RpbmcK"
+	b64data := "dGVzdGluZyBiYXNlNjQgZGVjb2Rpbmc="
 	decoder, _ := NewDecoder("base64")
 	data, err := decoder.DecodeString(b64data)
 	assert.Nil(t, err)

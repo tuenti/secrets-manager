@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/tuenti/secrets-manager/testutils"
 
 	"github.com/stretchr/testify/assert"
 	e "github.com/tuenti/secrets-manager/errors"
@@ -17,6 +16,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type fakeBackendSecret struct {
@@ -180,7 +181,7 @@ func TestGetCurrentState(t *testing.T) {
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
 	fakeSecretData := map[string][]byte{
-		"value1": []byte(testutils.RandString(10)),
+		"value1": []byte("Fake Value"),
 	}
 	k8s.EXPECT().ReadSecret("ns", "secret-name").AnyTimes().Return(fakeSecretData, nil)
 
@@ -226,7 +227,7 @@ func TestUpsertSecret(t *testing.T) {
 		},
 	}
 
-	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret)).Times(1).Return(nil)
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret)).Times(1).Return(nil)
 
 	ctx := context.Background()
 	fakeBackend := newFakeBackend([]fakeBackendSecret{})
@@ -258,7 +259,7 @@ func TestUpsertSecretError(t *testing.T) {
 		},
 	}
 
-	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret)).Times(1).Return(errors.New("some-error"))
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret)).Times(1).Return(errors.New("some-error"))
 
 	ctx := context.Background()
 	fakeBackend := newFakeBackend([]fakeBackendSecret{})
@@ -278,6 +279,7 @@ func TestUpsertSecretError(t *testing.T) {
 }
 
 func TestSyncState(t *testing.T) {
+	secretSyncErrorsCount.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -295,7 +297,7 @@ func TestSyncState(t *testing.T) {
 	}
 
 	k8s.EXPECT().ReadSecret("ns", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
-	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret)).Times(1).Return(nil)
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret)).Times(1).Return(nil)
 
 	ctx := context.Background()
 	fakeBackend := newFakeBackend([]fakeBackendSecret{
@@ -318,9 +320,13 @@ func TestSyncState(t *testing.T) {
 	})
 
 	assert.Nil(t, err)
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
 }
 
 func TestSyncStateErrorGetDesired(t *testing.T) {
+	secretSyncErrorsCount.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -344,9 +350,13 @@ func TestSyncStateErrorGetDesired(t *testing.T) {
 	})
 
 	assert.NotNil(t, err)
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
 }
 
 func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
+	secretSyncErrorsCount.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -374,8 +384,8 @@ func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
 	k8s.EXPECT().ReadSecret("ns1", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
 	k8s.EXPECT().ReadSecret("ns2", "secret-name").AnyTimes().Return(nil, errors.New("some error"))
 	k8s.EXPECT().ReadSecret("ns3", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
-	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret1)).Times(1).Return(nil)
-	k8s.EXPECT().UpsertSecret(testutils.EqSecret(expectedSecret3)).Times(1).Return(nil)
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret1)).Times(1).Return(nil)
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret3)).Times(1).Return(nil)
 
 	ctx := context.Background()
 	fakeBackend := newFakeBackend([]fakeBackendSecret{
@@ -398,6 +408,62 @@ func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
 	})
 
 	assert.Nil(t, err)
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount1, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns1")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount1))
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount2, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns2")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsCount2))
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount3, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns3")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount3))
+}
+
+func TestSyncStateErrorUpsertSecret(t *testing.T) {
+	secretSyncErrorsCount.Reset()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	k8s := mocks.NewMockKubernetesClient(mockCtrl)
+
+	fakeCurrentSecretData := map[string][]byte{
+		"value1": []byte("fake-current-data"),
+	}
+
+	expectedSecret1 := &kubernetes.Secret{
+		Name:      "secret-name",
+		Namespace: "ns1",
+		Data: map[string][]byte{
+			"value1": []byte("fake-content"),
+		},
+	}
+
+	k8s.EXPECT().ReadSecret("ns1", "secret-name").AnyTimes().Return(fakeCurrentSecretData, nil)
+	k8s.EXPECT().UpsertSecret(EqSecret(expectedSecret1)).Times(1).Return(errors.New("some error"))
+
+	ctx := context.Background()
+	fakeBackend := newFakeBackend([]fakeBackendSecret{
+		{"some/path", "key-in-vault", "fake-content"},
+	})
+	logger := log.New()
+	cfg := Config{ConfigMap: "cm"}
+	secretManager, _ := New(ctx, cfg, k8s, fakeBackend, logger)
+
+	err := secretManager.syncState(SecretDefinition{
+		Name:       "secret-name",
+		Namespaces: []string{"ns1"},
+		Type:       "Opaque",
+		Data: map[string]Datasource{
+			"value1": {
+				Path: "some/path",
+				Key:  "key-in-vault",
+			},
+		},
+	})
+
+	assert.Nil(t, err)
+	// Test Prometheus metric
+	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
 }
 
 func TestLoadConfig(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 
@@ -13,10 +14,14 @@ import (
 	"github.com/tuenti/secrets-manager/errors"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 const (
 	vaultAPIVersion       = "v1"
+	vaultFakeClusterName  = "vault-mock-cluster"
+	vaultFakeClusterID    = "vault-mock-cluster-1"
+	vaultFakeVersion      = "0.11.1"
 	selectedBackend       = "vault"
 	fakeToken             = "fake-token"
 	defaultTokenTTL       = 40
@@ -38,7 +43,7 @@ var (
 
 func v1SysHealth(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
-	jsonData := `
+	jsonData := fmt.Sprintf(`
 	{
 		"initialized": true,
 		"sealed": false,
@@ -47,10 +52,10 @@ func v1SysHealth(w http.ResponseWriter, r *http.Request) {
 		"replication_performance_mode": "disabled",
 		"replication_dr_mode": "disabled",
 		"server_time_utc": 1537804485,
-		"version": "0.11.1",
-		"cluster_name": "vault-cluster-mock",
-		"cluster_id": "mock-0"
-	}`
+		"version": "%s",
+		"cluster_name": "%s",
+		"cluster_id": "%s"
+	}`, vaultFakeVersion, vaultFakeClusterName, vaultFakeClusterID)
 
 	if err := json.Unmarshal([]byte(jsonData), &response); err != nil {
 		fmt.Printf("unable to unmarshal json %v", err)
@@ -175,7 +180,7 @@ func v1SecretTestKv1(w http.ResponseWriter, r *http.Request) {
 		"renewable": false,
 		"lease_duration": 0,
 		"data": {
-			"foo": "bar",
+			"foo": "bar"
 		},
 		"wrap_info": null,
 		"warnings": null,
@@ -201,8 +206,15 @@ func TestTokenNotExpired(t *testing.T) {
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 600
-	client.maxTokenTTL = 60
-	assert.False(t, client.isTokenExpired())
+	client.maxTokenTTL = 6
+	tokenTTL.Reset()
+	tokenExpired.Reset()
+	exp := client.isTokenExpired()
+	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	assert.False(t, exp)
+	assert.Equal(t, 600.0, testutil.ToFloat64(metricTokenTTL))
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
 }
 
 func TestTokenExpired(t *testing.T) {
@@ -212,7 +224,14 @@ func TestTokenExpired(t *testing.T) {
 	testCfg.tokenRenewable = true
 	testCfg.tokenTTL = 10
 	client.maxTokenTTL = 50
-	assert.True(t, client.isTokenExpired())
+	tokenTTL.Reset()
+	tokenExpired.Reset()
+	exp := client.isTokenExpired()
+	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	assert.True(t, exp)
+	assert.Equal(t, 10.0, testutil.ToFloat64(metricTokenTTL))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenExp))
 }
 
 func TestTokenNotRenewableExpired(t *testing.T) {
@@ -220,13 +239,22 @@ func TestTokenNotRenewableExpired(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
-	assert.False(t, client.isTokenExpired())
+	tokenExpired.Reset()
+	exp := client.isTokenExpired()
+	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	assert.False(t, exp)
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
 }
 
 func TestRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	err := client.renewToken()
 	assert.Nil(t, err)
+	tokenExpired.Reset()
+	exp := client.isTokenExpired()
+	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	assert.False(t, exp)
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
 }
 
 func TestReadSecretKv2(t *testing.T) {
@@ -248,9 +276,14 @@ func TestReadSecretKv1(t *testing.T) {
 
 func TestSecretNotFound(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
-	secretValue, err := client.ReadSecret("/secret/data/test", "foo2")
+	path := "/secret/data/test"
+	key := "foo2"
+	secretReadErrorsCount.Reset()
+	secretValue, err := client.ReadSecret(path, key)
 	assert.Empty(t, secretValue)
-	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, "foo2", "/secret/data/test"))
+	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, key, path))
+	metricSecretReadErrorsCount, _ := secretReadErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsCount))
 }
 
 func TestMain(m *testing.M) {
@@ -272,6 +305,7 @@ func TestMain(m *testing.M) {
 		VaultURL:                string(server.URL),
 		VaultToken:              fakeToken,
 		VaultTokenPollingPeriod: 1,
+		VaultEngine:             "kv2",
 	}
 
 	testCfg = &testConfig{
@@ -282,6 +316,5 @@ func TestMain(m *testing.M) {
 	_ctx, cancel := context.WithCancel(context.Background())
 	ctx = _ctx
 	defer cancel()
-
-	m.Run()
+	os.Exit(m.Run())
 }

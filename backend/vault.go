@@ -11,7 +11,10 @@ import (
 	"github.com/tuenti/secrets-manager/errors"
 )
 
-var logger *log.Logger
+var (
+	logger  *log.Logger
+	metrics *vaultMetrics
+)
 
 const defaultSecretKey = "data"
 
@@ -57,6 +60,8 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 		return nil, err
 	}
 
+	metrics = newVaultMetrics(cfg.VaultURL, health.Version, cfg.VaultEngine, health.ClusterID, health.ClusterName)
+
 	client := client{
 		vclient:            vclient,
 		logical:            logical,
@@ -77,6 +82,7 @@ func (c *client) isTokenExpired() bool {
 	lookup, err := auth.Token().LookupSelf()
 	if err != nil {
 		logger.Errorf("error checking token with lookup self api: %v", err)
+		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 		exp = true
 		return exp
 	}
@@ -85,6 +91,7 @@ func (c *client) isTokenExpired() bool {
 
 	if err != nil {
 		logger.Errorf("could not check token renewability: %v", err)
+		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 		exp = true
 		return exp
 	}
@@ -93,14 +100,20 @@ func (c *client) isTokenExpired() bool {
 		ttl, err = lookup.Data["ttl"].(json.Number).Int64()
 		if err != nil {
 			logger.Errorf("couldn't decode ttl from token: %v", err)
+			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 			exp = true
 			return exp
 		}
+
+		metrics.updateVaultTokenTTLMetric(ttl)
+
 		if ttl < c.maxTokenTTL {
 			logger.Warnf("token is really close to expire, current ttl: %d", ttl)
+			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
 			exp = true
 			return exp
 		}
+		metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
 	}
 
 	return exp
@@ -142,6 +155,7 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 	logical := c.logical
 	secret, err := logical.Read(path)
 	if err != nil {
+		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.UnknownErrorType)
 		return data, err
 	}
 
@@ -152,15 +166,18 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 			if secretData[key] != nil {
 				data = secretData[key].(string)
 			} else {
+				metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 				err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 			}
 		} else {
 			for _, w := range warnings {
 				logger.Warningln(w)
 			}
+			metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 			err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 		}
 	} else {
+		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
 		err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 	}
 	return data, err

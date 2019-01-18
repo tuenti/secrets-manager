@@ -1,6 +1,10 @@
-hash: 64f2cd1696925ce62b264434ae949e481c272c88d470d824d23610e071a6e6a1
-updated: 2018-09-30T17:57:28.389270936+02:00
+hash: 7b121090bc2b6e2e382995e1dfdfa301141e6c06328f4ac88cf91227e01c4447
+updated: 2019-01-15T15:07:40.793657934+01:00
 imports:
+- name: github.com/beorn7/perks
+  version: 3a771d992973f24aa725d07868b467d1ddfceafb
+  subpackages:
+  - quantile
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/gogo/protobuf
@@ -11,11 +15,11 @@ imports:
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/mock
-  version: c34cdb4725f4c3844d095133c6e40e448b86589b
+  version: 51421b967af1f557f93a59e0057aaf15ca02e29c
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
-  version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
+  version: aa810b61a9c79d51363740d207bb46cf8e620ed5
   subpackages:
   - proto
   - ptypes
@@ -69,10 +73,36 @@ imports:
   - helper/strutil
 - name: github.com/json-iterator/go
   version: 13f86432b882000a51c6e610c620974462691a97
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: c182affec369e30f25d3eb8cd8a478dee585ae7d
+  subpackages:
+  - pbutil
 - name: github.com/mitchellh/go-homedir
   version: ae18d6b8b3205b561c79e8e5f69bff09736185f4
 - name: github.com/mitchellh/mapstructure
   version: fa473d140ef3c6adf42d6b391fe76707f1f243c8
+- name: github.com/prometheus/client_golang
+  version: 505eaef017263e299324067d40ca2c48f6a2cf50
+  subpackages:
+  - prometheus
+  - prometheus/internal
+  - prometheus/promhttp
+- name: github.com/prometheus/client_model
+  version: f287a105a20ec685d797f65cd0ce8fbeaef42da1
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: 2998b132700a7d019ff618c06a234b47c1f3f681
+  subpackages:
+  - expfmt
+  - internal/bitbucket.org/ww/goautoneg
+  - model
+- name: github.com/prometheus/procfs
+  version: b1a0a9a36d7453ba0f62578b99712f3a6c5f82d1
+  subpackages:
+  - internal/util
+  - nfs
+  - xfs
 - name: github.com/ryanuber/go-glob
   version: 256dc444b735e061061cf46c809487313d5b0065
 - name: github.com/sirupsen/logrus

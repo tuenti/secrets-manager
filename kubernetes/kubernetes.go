@@ -60,6 +60,9 @@ func (k *client) UpsertSecret(secret *Secret) error {
 		logger.Debugf("updating secret '%s/%s'", secret.Namespace, secret.Name)
 		_, err = k.client.CoreV1().Secrets(secret.Namespace).Update(k8sSecret)
 	}
+	if err != nil {
+		secretUpdateErrorCount.WithLabelValues(secret.Name, secret.Namespace).Inc()
+	}
 	return err
 }
 
@@ -69,8 +72,10 @@ func (k *client) ReadSecret(namespace string, name string) (map[string][]byte, e
 	secret, err := k.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
+			secretReadErrorCount.WithLabelValues(name, namespace).Inc()
 			return data, &smerrors.K8sSecretNotFoundError{ErrType: smerrors.K8sSecretNotFoundErrorType, Name: name, Namespace: namespace}
 		}
+		secretReadErrorCount.WithLabelValues(name, namespace).Inc()
 		return data, err
 	}
 
