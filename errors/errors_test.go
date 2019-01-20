@@ -22,6 +22,8 @@ func TestGetErrorType(t *testing.T) {
 	assert.Equal(t, getErrorType(err6), EncodingNotImplementedErrorType)
 	err7 := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType}
 	assert.Equal(t, getErrorType(err7), VaultEngineNotImplementedErrorType)
+	err8 := &VaultTokenNotRenewableError{ErrType: VaultTokenNotRenewableErrorType}
+	assert.Equal(t, getErrorType(err8), VaultTokenNotRenewableErrorType)
 }
 
 func TestIsBackendNotImplemented(t *testing.T) {
@@ -62,6 +64,9 @@ func TestIsEncodingNotImplemented(t *testing.T) {
 func TestIsVaultEngineNotImplemented(t *testing.T) {
 	err := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType}
 	assert.True(t, IsVaultEngineNotImplemented(err))
-	err2 := e.New("foo")
-	assert.False(t, IsEncodingNotImplemented(err2))
+}
+
+func TestIsVaultTokenNotRenewable(t *testing.T) {
+	err := &VaultTokenNotRenewableError{ErrType: VaultTokenNotRenewableErrorType}
+	assert.True(t, IsVaultTokenNotRenewable(err))
 }

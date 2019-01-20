@@ -11,6 +11,7 @@ const (
 	InvalidConfigmapNameErrorType      = "InvalidConfigmapNameError"
 	EncodingNotImplementedErrorType    = "EncodingNotImplementedError"
 	VaultEngineNotImplementedErrorType = "VaultEngineNotImplementedError"
+	VaultTokenNotRenewableErrorType    = "VaultTokenNotRenewableError"
 )
 
 // BackendNotImplementedError will be raised if the selected backend is not implemented
@@ -51,6 +52,11 @@ type VaultEngineNotImplementedError struct {
 	Engine  string
 }
 
+// VaultTokenNotRenewableError will be raised if secrets-manager Vault token is not renewable
+type VaultTokenNotRenewableError struct {
+	ErrType string
+}
+
 func getErrorType(err error) string {
 	switch err.(type) {
 	case *BackendNotImplementedError:
@@ -65,6 +71,8 @@ func getErrorType(err error) string {
 		return EncodingNotImplementedErrorType
 	case *VaultEngineNotImplementedError:
 		return VaultEngineNotImplementedErrorType
+	case *VaultTokenNotRenewableError:
+		return VaultTokenNotRenewableErrorType
 	default:
 		return UnknownErrorType
 	}
@@ -92,6 +100,10 @@ func (e EncodingNotImplementedError) Error() string {
 
 func (e VaultEngineNotImplementedError) Error() string {
 	return fmt.Sprintf("[%s] vault engine %s not supported", e.ErrType, e.Engine)
+}
+
+func (e VaultTokenNotRenewableError) Error() string {
+	return fmt.Sprintf("[%s] vault token not renewable", e.ErrType)
 }
 
 // IsBackendNotImplemented returns true if the error is type of BackendNotImplementedError and false otherwise
@@ -122,4 +134,9 @@ func IsEncodingNotImplemented(err error) bool {
 // IsVaultEngineNotImplemented returns true if the error is type of VaultEngineNotImplementedError and false otherwise
 func IsVaultEngineNotImplemented(err error) bool {
 	return getErrorType(err) == VaultEngineNotImplementedErrorType
+}
+
+// IsVaultTokenNotRenewable returns true if the error is type of VaultTokenNotRenewableError and false otherwise
+func IsVaultTokenNotRenewable(err error) bool {
+	return getErrorType(err) == VaultTokenNotRenewableErrorType
 }
