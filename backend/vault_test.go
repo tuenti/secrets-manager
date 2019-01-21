@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -200,7 +201,7 @@ func TestVaultClient(t *testing.T) {
 }
 
 func TestVaultClientInvalidCfg(t *testing.T) {
-	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300"}
+	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1 * time.Second}
 	client, err := vaultClient(ctx, nil, invalidCfg)
 	assert.NotNil(t, err)
 	assert.Nil(t, client)

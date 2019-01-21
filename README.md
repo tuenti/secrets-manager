@@ -85,9 +85,9 @@ data:
 | `log.level` | warn | Minimum log level |
 | `log.format` | text | Log format, one of text or json |
 | `backend`| vault | Selected backend. Only vault supported for now |
+| `config.backend-timeout`| 5s | Backend connection timeout |
 | `config.backend-scrape-interval`| 15s | Scraping secrets from backend interval |
 | `config.config-map`| 15s | Name of the configmap with *secrets-manager* settings (format: `namespace/name`)  (default "secrets-manager-config") |
-| `config.backend-scrape-interval`| 15s | Scraping secrets from backend interval |
 | `config.configmap-refresh-interval`| 15s | ConfigMap refresh interval |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.token` | `""` | Vault token. `VAULT_TOKEN` environment would take precedence. |

@@ -35,6 +35,8 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 	}
 
 	httpClient := new(http.Client)
+	httpClient.Timeout = cfg.BackendTimeout
+
 	vclient, err := api.NewClient(&api.Config{Address: cfg.VaultURL, HttpClient: httpClient})
 
 	if err != nil {
