@@ -108,7 +108,7 @@ data:
 |`secrets_manager_vault_token_lookup_errors_count`| Counter | Vault token lookup-self errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "error"` |
 |`secrets_manager_vault_token_renew_errors_count`| Counter | Vault token renew-self errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "error"` |
 |`secrets_manager_read_secret_errors_count`| Counter | Vault read operations counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "path", "key", "error"` |
-|`secrets_manager_secret_updated`| Gauge |The up-to-date state of the secret: 1 = succesfully updated; 0 = couldn't update it|`"name", "namespace"`|
+| `secrets_manager_secret_sync_errors_count`| Counter |Secrets sync error counter|`"name", "namespace"`|
 |`secrets_manager_secret_last_updated`| Gauge |The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)|`"name", "namespace"`|
 
 ## Getting Started with Vault
