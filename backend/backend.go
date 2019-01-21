@@ -19,6 +19,7 @@ func init() {
 
 // Config type represent backend config, and should include all backends config
 type Config struct {
+	BackendTimeout          time.Duration
 	VaultURL                string
 	VaultToken              string
 	VaultMaxTokenTTL        int64

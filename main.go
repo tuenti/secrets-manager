@@ -51,6 +51,7 @@ func main() {
 	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 
 	flag.StringVar(&secretsManagerCfg.ConfigMap, "config.config-map", "secrets-manager-config", "Name of the config Map with Secrets Manager settings (format: [<namespace>/]<name>) ")
+	flag.DurationVar(&secretsManagerCfg.BackendScrapeInterval, "config.backend-timeout", 5*time.Second, "Backend connection timeout")
 	flag.DurationVar(&secretsManagerCfg.BackendScrapeInterval, "config.backend-scrape-interval", 15*time.Second, "Scraping secrets from backend interval")
 	flag.DurationVar(&secretsManagerCfg.ConfigMapRefreshInterval, "config.configmap-refresh-interval", 15*time.Second, "ConfigMap refresh interval")
 

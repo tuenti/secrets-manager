@@ -35,6 +35,8 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 	}
 
 	httpClient := new(http.Client)
+	httpClient.Timeout = cfg.BackendTimeout
+
 	vclient, err := api.NewClient(&api.Config{Address: cfg.VaultURL, HttpClient: httpClient})
 
 	if err != nil {
@@ -51,7 +53,7 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 		return nil, err
 	}
 
-	logger.Infof("successfully logged in to Vault cluster %s", health.ClusterName)
+	logger.Infof("successfully logged into Vault cluster %s", health.ClusterName)
 	logical := vclient.Logical()
 
 	engine, err := newEngine(cfg.VaultEngine)
@@ -74,55 +76,56 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 	return &client, err
 }
 
-func (c *client) isTokenExpired() bool {
-	var ttl int64
-	exp := false
+func (c *client) getToken() (*api.Secret, error) {
 	auth := c.vclient.Auth()
-
 	lookup, err := auth.Token().LookupSelf()
 	if err != nil {
 		logger.Errorf("error checking token with lookup self api: %v", err)
-		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
-		exp = true
-		return exp
+		metrics.updateVaultTokenLookupErrorsCountMetric(errors.UnknownErrorType)
+		return nil, err
 	}
-
-	isRenewable, err := lookup.TokenIsRenewable()
-
-	if err != nil {
-		logger.Errorf("could not check token renewability: %v", err)
-		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
-		exp = true
-		return exp
-	}
-
-	if isRenewable {
-		ttl, err = lookup.Data["ttl"].(json.Number).Int64()
-		if err != nil {
-			logger.Errorf("couldn't decode ttl from token: %v", err)
-			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
-			exp = true
-			return exp
-		}
-
-		metrics.updateVaultTokenTTLMetric(ttl)
-
-		if ttl < c.maxTokenTTL {
-			logger.Warnf("token is really close to expire, current ttl: %d", ttl)
-			metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
-			exp = true
-			return exp
-		}
-		metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
-	}
-
-	return exp
+	return lookup, nil
 }
 
-func (c *client) renewToken() error {
+func (c *client) getTokenTTL(token *api.Secret) (int64, error) {
+	var ttl int64
+	ttl, err := token.Data["ttl"].(json.Number).Int64()
+	if err != nil {
+		logger.Errorf("couldn't decode ttl from token: %v", err)
+		return -1, err
+	}
+	metrics.updateVaultTokenTTLMetric(ttl)
+	return ttl, nil
+}
+
+func (c *client) shouldRenewToken(ttl int64) bool {
+	if ttl < c.maxTokenTTL {
+		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
+		return true
+	}
+	metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
+	return false
+}
+
+func (c *client) renewToken(token *api.Secret) error {
+	isRenewable, err := token.TokenIsRenewable()
+	if err != nil {
+		logger.Errorf("could not check token renewability: %v", err)
+		metrics.updateVaultTokenRenewErrorsCountMetric(errors.UnknownErrorType)
+		return err
+	}
+	if !isRenewable {
+		metrics.updateVaultTokenRenewErrorsCountMetric(errors.VaultTokenNotRenewableErrorType)
+		err = &errors.VaultTokenNotRenewableError{ErrType: errors.VaultTokenNotRenewableErrorType}
+		return err
+	}
 	auth := c.vclient.Auth()
-	_, err := auth.Token().RenewSelf(c.renewTTLIncrement)
-	return err
+	if _, err = auth.Token().RenewSelf(c.renewTTLIncrement); err != nil {
+		log.Errorf("failed to renew token: %v", err)
+		metrics.updateVaultTokenRenewErrorsCountMetric(errors.UnknownErrorType)
+		return err
+	}
+	return nil
 }
 
 func (c *client) startTokenRenewer(ctx context.Context) {
@@ -130,13 +133,25 @@ func (c *client) startTokenRenewer(ctx context.Context) {
 		for {
 			select {
 			case <-time.After(c.tokenPollingPeriod):
-				if c.isTokenExpired() {
-					err := c.renewToken()
+				token, err := c.getToken()
+				if err != nil {
+					logger.Errorf("failed to fetch token: %v", err)
+					return
+				}
+				ttl, err := c.getTokenTTL(token)
+				if err != nil {
+					logger.Errorf("failed to read token TTL: %v", err)
+					return
+				} else if c.shouldRenewToken(ttl) {
+					logger.Warnf("token is really close to expire, current ttl: %d", ttl)
+					err := c.renewToken(token)
 					if err != nil {
 						logger.Errorf("could not renew token: %v", err)
 					} else {
 						logger.Infoln("token renewed successfully!")
 					}
+				} else {
+					return
 				}
 			case <-ctx.Done():
 				logger.Infoln("gracefully shutting down token renewal go routine")

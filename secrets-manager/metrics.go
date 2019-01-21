@@ -10,7 +10,7 @@ var (
 		Namespace: "secrets_manager",
 		Subsystem: "secret",
 		Name:      "sync_errors_count",
-		Help:      "The count errors when trying to sync a secret from backend into K8s",
+		Help:      "Secrets sync error counter",
 	}, []string{"name", "namespace"})
 
 	secretLastUpdated = prometheus.NewGaugeVec(prometheus.GaugeOpts{

@@ -2,10 +2,28 @@ package errors
 
 import (
 	e "errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestErrorString(t *testing.T) {
+	err1 := &BackendNotImplementedError{ErrType: BackendNotImplementedErrorType, Backend: "foo"}
+	assert.EqualError(t, err1, fmt.Sprintf("[%s] backend %s not supported", err1.ErrType, err1.Backend))
+	err2 := &BackendSecretNotFoundError{ErrType: BackendSecretNotFoundErrorType, Path: "foo", Key: "bar"}
+	assert.EqualError(t, err2, fmt.Sprintf("[%s] secret key %s not found at %s", err2.ErrType, err2.Key, err2.Path))
+	err3 := &K8sSecretNotFoundError{ErrType: K8sSecretNotFoundErrorType, Name: "foo", Namespace: "bar"}
+	assert.EqualError(t, err3, fmt.Sprintf("[%s] secret '%s/%s' not found", err3.ErrType, err3.Namespace, err3.Name))
+	err4 := &InvalidConfigmapNameError{ErrType: InvalidConfigmapNameErrorType, Value: "foo"}
+	assert.EqualError(t, err4, fmt.Sprintf("[%s] invalid configmap name '%s'", err4.ErrType, err4.Value))
+	err5 := &EncodingNotImplementedError{ErrType: EncodingNotImplementedErrorType, Encoding: "foo"}
+	assert.EqualError(t, err5, fmt.Sprintf("[%s] encoding %s not supported", err5.ErrType, err5.Encoding))
+	err6 := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType, Engine: "foo"}
+	assert.EqualError(t, err6, fmt.Sprintf("[%s] vault engine %s not supported", err6.ErrType, err6.Engine))
+	err7 := &VaultTokenNotRenewableError{ErrType: VaultTokenNotRenewableErrorType}
+	assert.EqualError(t, err7, fmt.Sprintf("[%s] vault token not renewable", err7.ErrType))
+}
 
 func TestGetErrorType(t *testing.T) {
 	err1 := e.New("foo")
@@ -22,6 +40,8 @@ func TestGetErrorType(t *testing.T) {
 	assert.Equal(t, getErrorType(err6), EncodingNotImplementedErrorType)
 	err7 := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType}
 	assert.Equal(t, getErrorType(err7), VaultEngineNotImplementedErrorType)
+	err8 := &VaultTokenNotRenewableError{ErrType: VaultTokenNotRenewableErrorType}
+	assert.Equal(t, getErrorType(err8), VaultTokenNotRenewableErrorType)
 }
 
 func TestIsBackendNotImplemented(t *testing.T) {
@@ -62,6 +82,9 @@ func TestIsEncodingNotImplemented(t *testing.T) {
 func TestIsVaultEngineNotImplemented(t *testing.T) {
 	err := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType}
 	assert.True(t, IsVaultEngineNotImplemented(err))
-	err2 := e.New("foo")
-	assert.False(t, IsEncodingNotImplemented(err2))
+}
+
+func TestIsVaultTokenNotRenewable(t *testing.T) {
+	err := &VaultTokenNotRenewableError{ErrType: VaultTokenNotRenewableErrorType}
+	assert.True(t, IsVaultTokenNotRenewable(err))
 }

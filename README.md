@@ -11,13 +11,6 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 
 *secrets-manager* tries to solve this, by reading secrets from Vault and comparing them to Kubernetes secrets, creating and updating them as you do it in Vault.
 
-# How it works
-
-*secrets-manager* gets initialized with a Vault token and a Kubernetes configmap. While it's running it will be checking in the background:
-
-- If Vault token is close to expire and if that's the case, renewing it.
-- The Kubernetes configmap data, reloading the mounted config file in case there is any change.
-
 # How does it compare to other tools?
 
 - [cert-manager](https://github.com/jetstack/cert-manager). *cert-manager* solves a different issue, automation around issuing and renewing certificates. It integrates with Let's Encrypt and Vault (using the pki backend) being those the certificates issuer. While this is really powerful and really a tool which is fully compatible with *secrets-manager*, it does not really sync a secret from a secret backend. *secrets-manager* is a more generic tool where you can sync certificates or any kind of secret from the source of truth of your secrets to Kubernetes secrets.
@@ -28,6 +21,14 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
   - *vault-crd* uses Hashicorp Vault as the source of truth, while *secrets-manager* has been designed to support other backends (we only support Vault for now,though).
   - *vault-crd* uses [Custom Resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) while *secrets-manager* uses configmaps. Configmap was the very first step, but we will migrate it to CRDs as part of our short-term roadmap.
   - *vault-crd* supports KV1 and pki engines, while *secrets-manager* supports KV1 and KV2. It is also in our roadmap to support more engines.
+
+# How it works
+
+*secrets-manager* gets initialized with a Vault token and a Kubernetes configmap. While it's running it will be checking in the background:
+
+- If Vault token is close to expire and if that's the case, renewing it.
+- The Kubernetes configmap data, reloading the mounted config file in case there is any change.
+
 
 ## Configmap
 
@@ -85,9 +86,9 @@ data:
 | `log.level` | warn | Minimum log level |
 | `log.format` | text | Log format, one of text or json |
 | `backend`| vault | Selected backend. Only vault supported for now |
+| `config.backend-timeout`| 5s | Backend connection timeout |
 | `config.backend-scrape-interval`| 15s | Scraping secrets from backend interval |
 | `config.config-map`| 15s | Name of the configmap with *secrets-manager* settings (format: `namespace/name`)  (default "secrets-manager-config") |
-| `config.backend-scrape-interval`| 15s | Scraping secrets from backend interval |
 | `config.configmap-refresh-interval`| 15s | ConfigMap refresh interval |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.token` | `""` | Vault token. `VAULT_TOKEN` environment would take precedence. |
@@ -96,7 +97,21 @@ data:
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
 
-## Get Started with Vault
+## Prometheus Metrics
+
+`secrets-manager` exposes the following [Prometheus](https://prometheus.io) metrics at `http://$cfg.listen-addr/metrics`:
+
+| Metric| Type| Description| Labels|
+| ------| ----|------------| ------|
+|`secrets_manager_vault_token_expired` | Gauge | Whether or not token TTL is under `vault.max-token-ttl`: 1 = expired; 0 = still valid | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
+|`secrets_manager_vault_token_ttl` | Gauge | Vault token TTL | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
+|`secrets_manager_vault_token_lookup_errors_count`| Counter | Vault token lookup-self errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "error"` |
+|`secrets_manager_vault_token_renew_errors_count`| Counter | Vault token renew-self errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "error"` |
+|`secrets_manager_read_secret_errors_count`| Counter | Vault read operations counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "path", "key", "error"` |
+| `secrets_manager_secret_sync_errors_count`| Counter |Secrets sync error counter|`"name", "namespace"`|
+|`secrets_manager_secret_last_updated`| Gauge |The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)|`"name", "namespace"`|
+
+## Getting Started with Vault
 
 ### Vault Policies
 

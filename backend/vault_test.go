@@ -9,12 +9,12 @@ import (
 	"os"
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/tuenti/secrets-manager/errors"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/tuenti/secrets-manager/errors"
 )
 
 const (
@@ -200,61 +200,92 @@ func TestVaultClient(t *testing.T) {
 	assert.NotNil(t, client)
 }
 
-func TestTokenNotExpired(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
-	mutex.Lock()
-	defer mutex.Unlock()
-	testCfg.tokenRenewable = true
-	testCfg.tokenTTL = 600
-	client.maxTokenTTL = 6
-	tokenTTL.Reset()
-	tokenExpired.Reset()
-	exp := client.isTokenExpired()
-	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-	assert.False(t, exp)
-	assert.Equal(t, 600.0, testutil.ToFloat64(metricTokenTTL))
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
+func TestVaultClientInvalidCfg(t *testing.T) {
+	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1 * time.Second}
+	client, err := vaultClient(ctx, nil, invalidCfg)
+	assert.NotNil(t, err)
+	assert.Nil(t, client)
 }
 
-func TestTokenExpired(t *testing.T) {
+func TestGetToken(t *testing.T) {
+	client, err := vaultClient(ctx, nil, vaultCfg)
+	token, err := client.getToken()
+	assert.NotNil(t, token)
+	assert.Nil(t, err)
+}
+
+func TestGetTokenTTL(t *testing.T) {
+	client, err := vaultClient(ctx, nil, vaultCfg)
+	tokenTTL.Reset()
+
+	token, err := client.getToken()
+	ttl, err := client.getTokenTTL(token)
+	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+
+	assert.Equal(t, float64(testCfg.tokenTTL), testutil.ToFloat64(metricTokenTTL))
+	assert.Equal(t, int64(testCfg.tokenTTL), ttl)
+	assert.Nil(t, err)
+}
+
+func TestShouldRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = true
-	testCfg.tokenTTL = 10
-	client.maxTokenTTL = 50
-	tokenTTL.Reset()
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 6000
 	tokenExpired.Reset()
-	exp := client.isTokenExpired()
-	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-	assert.True(t, exp)
-	assert.Equal(t, 10.0, testutil.ToFloat64(metricTokenTTL))
+
+	assert.True(t, client.shouldRenewToken(int64(testCfg.tokenTTL)))
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenExp))
 }
 
-func TestTokenNotRenewableExpired(t *testing.T) {
+func TestShouldNotRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = false
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 60
+
+	assert.False(t, client.shouldRenewToken(int64(testCfg.tokenTTL)))
+
 	tokenExpired.Reset()
-	exp := client.isTokenExpired()
 	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-	assert.False(t, exp)
+
 	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
 }
 
 func TestRenewToken(t *testing.T) {
 	client, _ := vaultClient(ctx, nil, vaultCfg)
-	err := client.renewToken()
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.tokenRenewable = true
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 6000
+
+	token, err := client.getToken()
+	err = client.renewToken(token)
+
 	assert.Nil(t, err)
-	tokenExpired.Reset()
-	exp := client.isTokenExpired()
-	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-	assert.False(t, exp)
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
+}
+
+func TestTokenNotRenewableError(t *testing.T) {
+	client, _ := vaultClient(ctx, nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.tokenRenewable = false
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 6000
+
+	token, err := client.getToken()
+
+	tokenRenewErrorsCount.Reset()
+	err = client.renewToken(token)
+
+	metricTokenRenewErrorsCount, _ := tokenRenewErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.VaultTokenNotRenewableErrorType)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+	assert.EqualError(t, err, fmt.Sprintf("[%s] vault token not renewable", errors.VaultTokenNotRenewableErrorType))
 }
 
 func TestReadSecretKv2(t *testing.T) {
@@ -280,12 +311,12 @@ func TestSecretNotFound(t *testing.T) {
 	key := "foo2"
 	secretReadErrorsCount.Reset()
 	secretValue, err := client.ReadSecret(path, key)
+	metricSecretReadErrorsCount, _ := secretReadErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
+
 	assert.Empty(t, secretValue)
 	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, key, path))
-	metricSecretReadErrorsCount, _ := secretReadErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsCount))
 }
-
 func TestMain(m *testing.M) {
 	r := mux.NewRouter()
 	v1SysHandler := r.PathPrefix(fmt.Sprintf("/%s/sys", vaultAPIVersion)).Subrouter()
