@@ -27,7 +27,7 @@ type client struct {
 	engine             engine
 }
 
-func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error) {
+func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 	if l != nil {
 		logger = l
 	} else {
@@ -72,7 +72,6 @@ func vaultClient(ctx context.Context, l *log.Logger, cfg Config) (*client, error
 		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
 		engine:             engine,
 	}
-	client.startTokenRenewer(ctx)
 	return &client, err
 }
 
@@ -128,31 +127,36 @@ func (c *client) renewToken(token *api.Secret) error {
 	return nil
 }
 
+func (c *client) renewalLoop() {
+	token, err := c.getToken()
+	if err != nil {
+		logger.Errorf("failed to fetch token: %v", err)
+		return
+	}
+	ttl, err := c.getTokenTTL(token)
+	if err != nil {
+		logger.Errorf("failed to read token TTL: %v", err)
+		return
+	} else if c.shouldRenewToken(ttl) {
+		logger.Warnf("token is really close to expire, current ttl: %d", ttl)
+		err := c.renewToken(token)
+		if err != nil {
+			logger.Errorf("could not renew token: %v", err)
+		} else {
+			logger.Infoln("token renewed successfully!")
+		}
+	} else {
+		return
+	}
+}
+
 func (c *client) startTokenRenewer(ctx context.Context) {
 	go func(ctx context.Context) {
 		for {
 			select {
 			case <-time.After(c.tokenPollingPeriod):
-				token, err := c.getToken()
-				if err != nil {
-					logger.Errorf("failed to fetch token: %v", err)
-					return
-				}
-				ttl, err := c.getTokenTTL(token)
-				if err != nil {
-					logger.Errorf("failed to read token TTL: %v", err)
-					return
-				} else if c.shouldRenewToken(ttl) {
-					logger.Warnf("token is really close to expire, current ttl: %d", ttl)
-					err := c.renewToken(token)
-					if err != nil {
-						logger.Errorf("could not renew token: %v", err)
-					} else {
-						logger.Infoln("token renewed successfully!")
-					}
-				} else {
-					return
-				}
+				c.renewalLoop()
+				break
 			case <-ctx.Done():
 				logger.Infoln("gracefully shutting down token renewal go routine")
 				return

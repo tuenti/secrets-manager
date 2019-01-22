@@ -44,7 +44,13 @@ func NewBackendClient(ctx context.Context, backend string, logger *log.Logger, c
 	}
 	switch backend {
 	case vaultBackendName:
-		client, err = vaultClient(ctx, logger, cfg)
+		vclient, verr := vaultClient(logger, cfg)
+		if verr != nil {
+			return nil, verr
+		}
+		vclient.startTokenRenewer(ctx)
+		client = vclient
+		err = verr
 	}
 	return &client, err
 }
