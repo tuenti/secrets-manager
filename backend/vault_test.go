@@ -26,16 +26,17 @@ const (
 	fakeToken             = "fake-token"
 	defaultTokenTTL       = 40
 	defaultTokenRenewable = true
+	defaultRevokedToken   = false
 )
 
 type testConfig struct {
 	tokenTTL       int
 	tokenRenewable bool
+	tokenRevoked   bool
 }
 
 var (
 	vaultCfg Config
-	ctx      context.Context
 	server   *httptest.Server
 	mutex    sync.Mutex
 	testCfg  *testConfig
@@ -67,37 +68,43 @@ func v1SysHealth(w http.ResponseWriter, r *http.Request) {
 
 func v1AuthTokenLookupSelf(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
+	jsonData := ""
+	if !testCfg.tokenRevoked {
+		jsonData = fmt.Sprintf(`
+		{
+			"request_id": "8d70f864-5f77-44fe-0940-df085376101f",
+			"lease_id": "",
+			"renewable": false,
+			"lease_duration": 0,
+			"data": {
+				"accessor": "d2d7308c-b9f2-3399-4202-11d670b8c053",
+				"creation_time": 1537810558,
+				"creation_ttl": 60,
+				"display_name": "token",
+				"entity_id": "",
+				"expire_time": "2018-09-24T17:36:58.797772932Z",
+				"explicit_max_ttl": 0,
+				"id": "31a5ea4e-907d-c1b9-1dfc-6b88526be248",
+				"issue_time": "2018-09-24T17:35:58.79776585Z",
+				"meta": null,
+				"num_uses": 0,
+				"orphan": false,
+				"path": "auth/token/create",
+				"policies": [
+					"fake-policy"
+				],
+				"renewable": %t,
+				"ttl": %d
+			},
+			"wrap_info": null,
+			"warnings": null,
+			"auth": null
+		}`, testCfg.tokenRenewable, testCfg.tokenTTL)
+	} else {
+		jsonData = `{"errors":["permission denied"]}`
+		w.WriteHeader(http.StatusForbidden)
+	}
 
-	jsonData := fmt.Sprintf(`
-	{
-		"request_id": "8d70f864-5f77-44fe-0940-df085376101f",
-		"lease_id": "",
-		"renewable": false,
-		"lease_duration": 0,
-		"data": {
-			"accessor": "d2d7308c-b9f2-3399-4202-11d670b8c053",
-			"creation_time": 1537810558,
-			"creation_ttl": 60,
-			"display_name": "token",
-			"entity_id": "",
-			"expire_time": "2018-09-24T17:36:58.797772932Z",
-			"explicit_max_ttl": 0,
-			"id": "31a5ea4e-907d-c1b9-1dfc-6b88526be248",
-			"issue_time": "2018-09-24T17:35:58.79776585Z",
-			"meta": null,
-			"num_uses": 0,
-			"orphan": false,
-			"path": "auth/token/create",
-			"policies": [
-				"fake-policy"
-			],
-			"renewable": %t,
-			"ttl": %d
-		},
-		"wrap_info": null,
-		"warnings": null,
-		"auth": null
-	}`, testCfg.tokenRenewable, testCfg.tokenTTL)
 	if err := json.Unmarshal([]byte(jsonData), &response); err != nil {
 		fmt.Printf("unable to unmarshal json %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -194,28 +201,44 @@ func v1SecretTestKv1(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func TestVaultBackendInvalidCfg(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1}
+	backend := "vault"
+	client, err := NewBackendClient(ctx, backend, nil, cfg)
+	assert.NotNil(t, err)
+	assert.Nil(t, client)
+}
+func TestVaultBackend(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client, err := NewBackendClient(ctx, "vault", nil, vaultCfg)
+	assert.Nil(t, err)
+	assert.NotNil(t, client)
+}
 func TestVaultClient(t *testing.T) {
-	client, err := vaultClient(ctx, nil, vaultCfg)
+	client, err := vaultClient(nil, vaultCfg)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
 }
 
 func TestVaultClientInvalidCfg(t *testing.T) {
 	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1 * time.Second}
-	client, err := vaultClient(ctx, nil, invalidCfg)
+	client, err := vaultClient(nil, invalidCfg)
 	assert.NotNil(t, err)
 	assert.Nil(t, client)
 }
 
 func TestGetToken(t *testing.T) {
-	client, err := vaultClient(ctx, nil, vaultCfg)
+	client, err := vaultClient(nil, vaultCfg)
 	token, err := client.getToken()
 	assert.NotNil(t, token)
 	assert.Nil(t, err)
 }
 
 func TestGetTokenTTL(t *testing.T) {
-	client, err := vaultClient(ctx, nil, vaultCfg)
+	client, err := vaultClient(nil, vaultCfg)
 	tokenTTL.Reset()
 
 	token, err := client.getToken()
@@ -228,7 +251,7 @@ func TestGetTokenTTL(t *testing.T) {
 }
 
 func TestShouldRenewToken(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenTTL = 600
@@ -241,7 +264,7 @@ func TestShouldRenewToken(t *testing.T) {
 }
 
 func TestShouldNotRenewToken(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenTTL = 600
@@ -256,7 +279,7 @@ func TestShouldNotRenewToken(t *testing.T) {
 }
 
 func TestRenewToken(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = true
@@ -270,7 +293,7 @@ func TestRenewToken(t *testing.T) {
 }
 
 func TestTokenNotRenewableError(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
@@ -288,8 +311,36 @@ func TestTokenNotRenewableError(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("[%s] vault token not renewable", errors.VaultTokenNotRenewableErrorType))
 }
 
+func TestRenewalLoopRevokedToken(t *testing.T) {
+	client, _ := vaultClient(nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.tokenRevoked = true
+	tokenLookupErrorsCount.Reset()
+	client.renewalLoop()
+	metricTokenLookupErrorsCount, _ := tokenLookupErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.UnknownErrorType)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenLookupErrorsCount))
+}
+
+func TestRenewalLoopNotRenewableToken(t *testing.T) {
+	client, _ := vaultClient(nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.tokenRenewable = false
+	testCfg.tokenRevoked = false
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 6000
+
+	tokenRenewErrorsCount.Reset()
+	client.renewalLoop()
+	metricTokenRenewErrorsCount, _ := tokenRenewErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.VaultTokenNotRenewableErrorType)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+}
+
 func TestReadSecretKv2(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	secretValue, err := client.ReadSecret("/secret/data/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
@@ -299,14 +350,14 @@ func TestReadSecretKv1(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	vaultCfg.VaultEngine = "kv1"
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	secretValue, err := client.ReadSecret("/secret/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
 }
 
 func TestSecretNotFound(t *testing.T) {
-	client, _ := vaultClient(ctx, nil, vaultCfg)
+	client, _ := vaultClient(nil, vaultCfg)
 	path := "/secret/data/test"
 	key := "foo2"
 	secretReadErrorsCount.Reset()
@@ -342,10 +393,8 @@ func TestMain(m *testing.M) {
 	testCfg = &testConfig{
 		tokenRenewable: defaultTokenRenewable,
 		tokenTTL:       defaultTokenTTL,
+		tokenRevoked:   defaultRevokedToken,
 	}
 
-	_ctx, cancel := context.WithCancel(context.Background())
-	ctx = _ctx
-	defer cancel()
 	os.Exit(m.Run())
 }
