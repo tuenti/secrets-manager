@@ -96,6 +96,7 @@ data:
 | `vault.max-token-ttl` | 300 |Max seconds to consider a token expired. |
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
+| `listen-address` | `:8080` | The address to listen on for HTTP requests. |
 
 ## Prometheus Metrics
 
