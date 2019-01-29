@@ -6,11 +6,11 @@ import (
 
 var (
 	// Prometeheus metrics: https://prometheus.io
-	secretSyncErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	secretSyncErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "secret",
-		Name:      "sync_errors_count",
-		Help:      "Secrets sync error counter",
+		Name:      "sync_errors_total",
+		Help:      "Secrets synchronization total errors.",
 	}, []string{"name", "namespace"})
 
 	secretLastUpdated = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -22,6 +22,6 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(secretSyncErrorsCount)
+	prometheus.MustRegister(secretSyncErrorsTotal)
 	prometheus.MustRegister(secretLastUpdated)
 }

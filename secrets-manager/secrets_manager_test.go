@@ -279,7 +279,7 @@ func TestUpsertSecretError(t *testing.T) {
 }
 
 func TestSyncState(t *testing.T) {
-	secretSyncErrorsCount.Reset()
+	secretSyncErrorsTotal.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -321,12 +321,12 @@ func TestSyncState(t *testing.T) {
 
 	assert.Nil(t, err)
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
+	metricSecretSyncErrorsTotal, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsTotal))
 }
 
 func TestSyncStateErrorGetDesired(t *testing.T) {
-	secretSyncErrorsCount.Reset()
+	secretSyncErrorsTotal.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -351,12 +351,12 @@ func TestSyncStateErrorGetDesired(t *testing.T) {
 
 	assert.NotNil(t, err)
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
+	metricSecretSyncErrorsTotal, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsTotal))
 }
 
 func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
-	secretSyncErrorsCount.Reset()
+	secretSyncErrorsTotal.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -409,18 +409,18 @@ func TestSyncStateErrorGetCurrentInOneSecret(t *testing.T) {
 
 	assert.Nil(t, err)
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount1, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns1")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount1))
+	metricSecretSyncErrorsTotal1, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns1")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsTotal1))
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount2, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns2")
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsCount2))
+	metricSecretSyncErrorsTotal2, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns2")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretSyncErrorsTotal2))
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount3, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns3")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount3))
+	metricSecretSyncErrorsTotal3, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns3")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsTotal3))
 }
 
 func TestSyncStateErrorUpsertSecret(t *testing.T) {
-	secretSyncErrorsCount.Reset()
+	secretSyncErrorsTotal.Reset()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	k8s := mocks.NewMockKubernetesClient(mockCtrl)
@@ -462,8 +462,8 @@ func TestSyncStateErrorUpsertSecret(t *testing.T) {
 
 	assert.Nil(t, err)
 	// Test Prometheus metric
-	metricSecretSyncErrorsCount, _ := secretSyncErrorsCount.GetMetricWithLabelValues("secret-name", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsCount))
+	metricSecretSyncErrorsTotal, _ := secretSyncErrorsTotal.GetMetricWithLabelValues("secret-name", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretSyncErrorsTotal))
 }
 
 func TestLoadConfig(t *testing.T) {
