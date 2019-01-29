@@ -1,6 +1,6 @@
 # Stage 0
 # Build binary file
-FROM golang:1.10-alpine
+FROM golang:1.11.5-alpine as builder
 ENV GLIDE_VERSION v0.13.2
 
 RUN wget "https://github.com/Masterminds/glide/releases/download/${GLIDE_VERSION}/glide-${GLIDE_VERSION}-linux-amd64.tar.gz" \
@@ -25,5 +25,5 @@ RUN make build-linux
 FROM alpine:3.8
 ARG PROJECT_SLUG=github.com/tuenti/secrets-manager
 LABEL maintainer="sre@tuenti.com"
-COPY --from=0 /go/src/$PROJECT_SLUG/build/secrets-manager /secrets-manager
+COPY --from=builder /go/src/$PROJECT_SLUG/build/secrets-manager /secrets-manager
 ENTRYPOINT ["/secrets-manager"]
