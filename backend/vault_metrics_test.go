@@ -16,13 +16,13 @@ const (
 	fakeVaultClusterName = "vault-fake"
 )
 
-func TestUpdateTokenExpired(t *testing.T) {
+func TestUpdateMaxTokenTTL(t *testing.T) {
 	metrics := newVaultMetrics(fakeVaultAddress, fakeVaultVersion, fakeVaultEngine, fakeVaultClusterID, fakeVaultClusterName)
-	tokenExpired.Reset()
-	metrics.updateVaultTokenExpiredMetric(1)
-	metricTokenExpired, _ := tokenExpired.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName)
+	maxTokenTTL.Reset()
+	metrics.updateVaultMaxTokenTTLMetric(600)
+	metricMaxTokenTTL, _ := maxTokenTTL.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenExpired))
+	assert.Equal(t, 600.0, testutil.ToFloat64(metricMaxTokenTTL))
 }
 
 func TestUpdateTokenTTL(t *testing.T) {
@@ -34,44 +34,44 @@ func TestUpdateTokenTTL(t *testing.T) {
 	assert.Equal(t, 300.0, testutil.ToFloat64(metricTokenTTL))
 }
 
-func TestUpdateTokenLookupErrorsCount(t *testing.T) {
+func TestUpdateTokenLookupErrorsTotal(t *testing.T) {
 	metrics := newVaultMetrics(fakeVaultAddress, fakeVaultVersion, fakeVaultEngine, fakeVaultClusterID, fakeVaultClusterName)
-	tokenLookupErrorsCount.Reset()
-	metrics.updateVaultTokenLookupErrorsCountMetric(errors.UnknownErrorType)
-	metricTokenLookupErrorsCount, _ := tokenLookupErrorsCount.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, errors.UnknownErrorType)
+	tokenRenewalErrorsTotal.Reset()
+	metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultLookupSelfOperationName, errors.UnknownErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, vaultLookupSelfOperationName, errors.UnknownErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenLookupErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
-func TestUpdateTokenRenewErrorsCount(t *testing.T) {
+func TestUpdateTokenRenewErrorsTotal(t *testing.T) {
 	metrics := newVaultMetrics(fakeVaultAddress, fakeVaultVersion, fakeVaultEngine, fakeVaultClusterID, fakeVaultClusterName)
-	tokenRenewErrorsCount.Reset()
-	metrics.updateVaultTokenRenewErrorsCountMetric(errors.UnknownErrorType)
-	metricTokenRenewErrorsCount, _ := tokenRenewErrorsCount.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, errors.UnknownErrorType)
+	tokenRenewalErrorsTotal.Reset()
+	metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultRenewSelfOperationName, errors.UnknownErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, vaultRenewSelfOperationName, errors.UnknownErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 
-	tokenRenewErrorsCount.Reset()
-	metrics.updateVaultTokenRenewErrorsCountMetric(errors.VaultTokenNotRenewableErrorType)
-	metricTokenRenewErrorsCount, _ = tokenRenewErrorsCount.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, errors.VaultTokenNotRenewableErrorType)
+	tokenRenewalErrorsTotal.Reset()
+	metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
+	metricTokenRenewalErrorsTotal, _ = tokenRenewalErrorsTotal.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
-func TestUpdateReadSecretErrorsCount(t *testing.T) {
+func TestUpdateReadSecretErrorsTotal(t *testing.T) {
 	path := "/path/to/secret"
 	key := "key"
 
 	metrics := newVaultMetrics(fakeVaultAddress, fakeVaultVersion, fakeVaultEngine, fakeVaultClusterID, fakeVaultClusterName)
-	secretReadErrorsCount.Reset()
-	metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.UnknownErrorType)
-	metricSecretReadErrorsCount, _ := secretReadErrorsCount.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, path, key, errors.UnknownErrorType)
+	secretReadErrorsTotal.Reset()
+	metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.UnknownErrorType)
+	metricSecretReadErrorsTotal, _ := secretReadErrorsTotal.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, path, key, errors.UnknownErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 
-	secretReadErrorsCount.Reset()
-	metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
-	metricSecretReadErrorsCount, _ = secretReadErrorsCount.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, path, key, errors.BackendSecretNotFoundErrorType)
+	secretReadErrorsTotal.Reset()
+	metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
+	metricSecretReadErrorsTotal, _ = secretReadErrorsTotal.GetMetricWithLabelValues(fakeVaultAddress, fakeVaultEngine, fakeVaultVersion, fakeVaultClusterID, fakeVaultClusterName, path, key, errors.BackendSecretNotFoundErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 }
