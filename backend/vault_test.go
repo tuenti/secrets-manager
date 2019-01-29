@@ -115,30 +115,36 @@ func v1AuthTokenLookupSelf(w http.ResponseWriter, r *http.Request) {
 
 func v1AuthTokenRenewSelf(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
-
-	jsonData := fmt.Sprintf(`{
-		"request_id": "d8ae3e67-91a0-2f7a-528b-522048f9dad3",
-		"lease_id": "",
-		"renewable": false,
-		"lease_duration": 0,
-		"data": null,
-		"wrap_info": null,
-		"warnings": null,
-		"auth": {
-			"client_token": "%s",
-			"accessor": "dc6aa861-3020-322c-8df5-4b08afa43a34",
-			"policies": [
-				"fake-policy"
-			],
-			"token_policies": [
-				"fake-policy"
-			],
-			"metadata": null,
-			"lease_duration": 1000,
-			"renewable": true,
-			"entity_id": ""
-		}
-	}`, fakeToken)
+	jsonData := ""
+	if !testCfg.tokenRevoked {
+		jsonData = fmt.Sprintf(`
+		{
+			"request_id": "d8ae3e67-91a0-2f7a-528b-522048f9dad3",
+			"lease_id": "",
+			"renewable": false,
+			"lease_duration": 0,
+			"data": null,
+			"wrap_info": null,
+			"warnings": null,
+			"auth": {
+				"client_token": "%s",
+				"accessor": "dc6aa861-3020-322c-8df5-4b08afa43a34",
+				"policies": [
+					"fake-policy"
+				],
+				"token_policies": [
+					"fake-policy"
+				],
+				"metadata": null,
+				"lease_duration": 1000,
+				"renewable": true,
+				"entity_id": ""
+			}
+		}`, fakeToken)
+	} else {
+		jsonData = `{"errors":["permission denied"]}`
+		w.WriteHeader(http.StatusForbidden)
+	}
 	if err := json.Unmarshal([]byte(jsonData), &response); err != nil {
 		fmt.Printf("unable to unmarshal json %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -218,9 +224,12 @@ func TestVaultBackend(t *testing.T) {
 	assert.NotNil(t, client)
 }
 func TestVaultClient(t *testing.T) {
+	maxTokenTTL.Reset()
 	client, err := vaultClient(nil, vaultCfg)
+	metricMaxTokenTTL, _ := maxTokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
+	assert.Equal(t, float64(client.maxTokenTTL), testutil.ToFloat64(metricMaxTokenTTL))
 }
 
 func TestVaultClientInvalidCfg(t *testing.T) {
@@ -250,34 +259,6 @@ func TestGetTokenTTL(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestShouldRenewToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
-	mutex.Lock()
-	defer mutex.Unlock()
-	testCfg.tokenTTL = 600
-	client.maxTokenTTL = 6000
-	tokenExpired.Reset()
-	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-
-	assert.True(t, client.shouldRenewToken(int64(testCfg.tokenTTL)))
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenExp))
-}
-
-func TestShouldNotRenewToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
-	mutex.Lock()
-	defer mutex.Unlock()
-	testCfg.tokenTTL = 600
-	client.maxTokenTTL = 60
-
-	assert.False(t, client.shouldRenewToken(int64(testCfg.tokenTTL)))
-
-	tokenExpired.Reset()
-	metricTokenExp, _ := tokenExpired.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
-
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricTokenExp))
-}
-
 func TestRenewToken(t *testing.T) {
 	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
@@ -292,6 +273,23 @@ func TestRenewToken(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestRenewTokenRevokedToken(t *testing.T) {
+	client, _ := vaultClient(nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.tokenRenewable = true
+	testCfg.tokenTTL = 600
+	client.maxTokenTTL = 6000
+
+	token, err := client.getToken()
+	testCfg.tokenRevoked = true
+	tokenRenewalErrorsTotal.Reset()
+	err = client.renewToken(token)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultRenewSelfOperationName, errors.UnknownErrorType)
+	assert.NotNil(t, err)
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
+}
+
 func TestTokenNotRenewableError(t *testing.T) {
 	client, _ := vaultClient(nil, vaultCfg)
 	mutex.Lock()
@@ -302,12 +300,12 @@ func TestTokenNotRenewableError(t *testing.T) {
 
 	token, err := client.getToken()
 
-	tokenRenewErrorsCount.Reset()
+	tokenRenewalErrorsTotal.Reset()
 	err = client.renewToken(token)
 
-	metricTokenRenewErrorsCount, _ := tokenRenewErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.VaultTokenNotRenewableErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 	assert.EqualError(t, err, fmt.Sprintf("[%s] vault token not renewable", errors.VaultTokenNotRenewableErrorType))
 }
 
@@ -316,11 +314,11 @@ func TestRenewalLoopRevokedToken(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRevoked = true
-	tokenLookupErrorsCount.Reset()
+	tokenRenewalErrorsTotal.Reset()
 	client.renewalLoop()
-	metricTokenLookupErrorsCount, _ := tokenLookupErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.UnknownErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultLookupSelfOperationName, errors.UnknownErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenLookupErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
 func TestRenewalLoopNotRenewableToken(t *testing.T) {
@@ -332,11 +330,11 @@ func TestRenewalLoopNotRenewableToken(t *testing.T) {
 	testCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
-	tokenRenewErrorsCount.Reset()
+	tokenRenewalErrorsTotal.Reset()
 	client.renewalLoop()
-	metricTokenRenewErrorsCount, _ := tokenRenewErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, errors.VaultTokenNotRenewableErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
 func TestReadSecretKv2(t *testing.T) {
@@ -360,13 +358,13 @@ func TestSecretNotFound(t *testing.T) {
 	client, _ := vaultClient(nil, vaultCfg)
 	path := "/secret/data/test"
 	key := "foo2"
-	secretReadErrorsCount.Reset()
+	secretReadErrorsTotal.Reset()
 	secretValue, err := client.ReadSecret(path, key)
-	metricSecretReadErrorsCount, _ := secretReadErrorsCount.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
+	metricSecretReadErrorsTotal, _ := secretReadErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
 
 	assert.Empty(t, secretValue)
 	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, key, path))
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsCount))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 }
 func TestMain(m *testing.M) {
 	r := mux.NewRouter()

@@ -3,44 +3,39 @@ package backend
 import "github.com/prometheus/client_golang/prometheus"
 
 const (
-	vaultTokenExpired    = 1
-	vaultTokenNotExpired = 0
+	vaultLookupSelfOperationName  = "lookup-self"
+	vaultRenewSelfOperationName   = "renew-self"
+	vaultIsRenewableOperationName = "is-renewable"
 )
 
 var (
-	vaultLabelNames  = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
-	secretLabelNames = []string{"path", "key", "error"}
-	errorLabelNames  = []string{"error"}
+	vaultLabelNames      = []string{"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"}
+	secretLabelNames     = []string{"path", "key", "error"}
+	vaultErrorLabelNames = []string{"vault_operation", "error"}
 
 	// Prometeheus metrics: https://prometheus.io
-	tokenExpired = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "secrets_manager",
-		Subsystem: "vault",
-		Name:      "token_expired",
-		Help:      "The state of the token: 1 = expired; 0 = still valid",
-	}, vaultLabelNames)
 	tokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "token_ttl",
 		Help:      "Vault token TTL",
 	}, vaultLabelNames)
-	tokenLookupErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	maxTokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
-		Name:      "token_lookup_errors_count",
-		Help:      "Vault token lookup-self errors counter",
-	}, append(vaultLabelNames, errorLabelNames...))
-	tokenRenewErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "max_token_ttl",
+		Help:      "secrets-manager max Vault token TTL",
+	}, vaultLabelNames)
+	tokenRenewalErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
-		Name:      "token_renew_errors_count",
-		Help:      "Vault token renew-self errors counter",
-	}, append(vaultLabelNames, errorLabelNames...))
-	secretReadErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "token_renewal_errors_total",
+		Help:      "Vault token renewal errors counter",
+	}, append(vaultLabelNames, vaultErrorLabelNames...))
+	secretReadErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
-		Name:      "read_secret_errors_count",
+		Name:      "read_secret_errors_total",
 		Help:      "Vault read operations counter",
 	}, append(vaultLabelNames, secretLabelNames...))
 )
@@ -50,11 +45,10 @@ type vaultMetrics struct {
 }
 
 func init() {
-	prometheus.MustRegister(tokenExpired)
 	prometheus.MustRegister(tokenTTL)
-	prometheus.MustRegister(tokenLookupErrorsCount)
-	prometheus.MustRegister(tokenRenewErrorsCount)
-	prometheus.MustRegister(secretReadErrorsCount)
+	prometheus.MustRegister(maxTokenTTL)
+	prometheus.MustRegister(tokenRenewalErrorsTotal)
+	prometheus.MustRegister(secretReadErrorsTotal)
 }
 
 func newVaultMetrics(vaultAddr string, vaultVersion string, vaultEngine string, vaultClusterID string, vaultClusterName string) *vaultMetrics {
@@ -68,13 +62,8 @@ func newVaultMetrics(vaultAddr string, vaultVersion string, vaultEngine string, 
 	return &vaultMetrics{vaultLabels: labels}
 }
 
-func (vm *vaultMetrics) updateVaultTokenExpiredMetric(value int) {
-	if value != vaultTokenExpired && value != vaultTokenNotExpired {
-		logger.Errorf("refusing to update secrets_manager_vault_token_expired metric with value %d. Allowed values are %d and %d", value, vaultTokenExpired, vaultTokenNotExpired)
-		return
-	}
-
-	tokenExpired.WithLabelValues(
+func (vm *vaultMetrics) updateVaultMaxTokenTTLMetric(value int64) {
+	maxTokenTTL.WithLabelValues(
 		vm.vaultLabels["vault_addr"],
 		vm.vaultLabels["vault_engine"],
 		vm.vaultLabels["vault_version"],
@@ -91,8 +80,8 @@ func (vm *vaultMetrics) updateVaultTokenTTLMetric(value int64) {
 		vm.vaultLabels["vault_cluster_name"]).Set(float64(value))
 }
 
-func (vm *vaultMetrics) updateVaultSecretReadErrorsCountMetric(path string, key string, errorType string) {
-	secretReadErrorsCount.WithLabelValues(
+func (vm *vaultMetrics) updateVaultSecretReadErrorsTotalMetric(path string, key string, errorType string) {
+	secretReadErrorsTotal.WithLabelValues(
 		vm.vaultLabels["vault_addr"],
 		vm.vaultLabels["vault_engine"],
 		vm.vaultLabels["vault_version"],
@@ -103,22 +92,13 @@ func (vm *vaultMetrics) updateVaultSecretReadErrorsCountMetric(path string, key 
 		errorType).Inc()
 }
 
-func (vm *vaultMetrics) updateVaultTokenLookupErrorsCountMetric(errorType string) {
-	tokenLookupErrorsCount.WithLabelValues(
+func (vm *vaultMetrics) updateVaultTokenRenewalErrorsTotalMetric(vaultOperation string, errorType string) {
+	tokenRenewalErrorsTotal.WithLabelValues(
 		vm.vaultLabels["vault_addr"],
 		vm.vaultLabels["vault_engine"],
 		vm.vaultLabels["vault_version"],
 		vm.vaultLabels["vault_cluster_id"],
 		vm.vaultLabels["vault_cluster_name"],
-		errorType).Inc()
-}
-
-func (vm *vaultMetrics) updateVaultTokenRenewErrorsCountMetric(errorType string) {
-	tokenRenewErrorsCount.WithLabelValues(
-		vm.vaultLabels["vault_addr"],
-		vm.vaultLabels["vault_engine"],
-		vm.vaultLabels["vault_version"],
-		vm.vaultLabels["vault_cluster_id"],
-		vm.vaultLabels["vault_cluster_name"],
+		vaultOperation,
 		errorType).Inc()
 }

@@ -72,6 +72,9 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
 		engine:             engine,
 	}
+
+	metrics.updateVaultMaxTokenTTLMetric(cfg.VaultMaxTokenTTL)
+
 	return &client, err
 }
 
@@ -80,7 +83,7 @@ func (c *client) getToken() (*api.Secret, error) {
 	lookup, err := auth.Token().LookupSelf()
 	if err != nil {
 		logger.Errorf("error checking token with lookup self api: %v", err)
-		metrics.updateVaultTokenLookupErrorsCountMetric(errors.UnknownErrorType)
+		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultLookupSelfOperationName, errors.UnknownErrorType)
 		return nil, err
 	}
 	return lookup, nil
@@ -97,31 +100,22 @@ func (c *client) getTokenTTL(token *api.Secret) (int64, error) {
 	return ttl, nil
 }
 
-func (c *client) shouldRenewToken(ttl int64) bool {
-	if ttl < c.maxTokenTTL {
-		metrics.updateVaultTokenExpiredMetric(vaultTokenExpired)
-		return true
-	}
-	metrics.updateVaultTokenExpiredMetric(vaultTokenNotExpired)
-	return false
-}
-
 func (c *client) renewToken(token *api.Secret) error {
 	isRenewable, err := token.TokenIsRenewable()
 	if err != nil {
 		logger.Errorf("could not check token renewability: %v", err)
-		metrics.updateVaultTokenRenewErrorsCountMetric(errors.UnknownErrorType)
+		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.UnknownErrorType)
 		return err
 	}
 	if !isRenewable {
-		metrics.updateVaultTokenRenewErrorsCountMetric(errors.VaultTokenNotRenewableErrorType)
+		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 		err = &errors.VaultTokenNotRenewableError{ErrType: errors.VaultTokenNotRenewableErrorType}
 		return err
 	}
 	auth := c.vclient.Auth()
 	if _, err = auth.Token().RenewSelf(c.renewTTLIncrement); err != nil {
 		log.Errorf("failed to renew token: %v", err)
-		metrics.updateVaultTokenRenewErrorsCountMetric(errors.UnknownErrorType)
+		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultRenewSelfOperationName, errors.UnknownErrorType)
 		return err
 	}
 	return nil
@@ -137,7 +131,7 @@ func (c *client) renewalLoop() {
 	if err != nil {
 		logger.Errorf("failed to read token TTL: %v", err)
 		return
-	} else if c.shouldRenewToken(ttl) {
+	} else if ttl < c.maxTokenTTL {
 		logger.Warnf("token is really close to expire, current ttl: %d", ttl)
 		err := c.renewToken(token)
 		if err != nil {
@@ -174,7 +168,7 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 	logical := c.logical
 	secret, err := logical.Read(path)
 	if err != nil {
-		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.UnknownErrorType)
+		metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.UnknownErrorType)
 		return data, err
 	}
 
@@ -185,18 +179,18 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 			if secretData[key] != nil {
 				data = secretData[key].(string)
 			} else {
-				metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
+				metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 				err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 			}
 		} else {
 			for _, w := range warnings {
 				logger.Warningln(w)
 			}
-			metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
+			metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 			err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 		}
 	} else {
-		metrics.updateVaultSecretReadErrorsCountMetric(path, key, errors.BackendSecretNotFoundErrorType)
+		metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 		err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 	}
 	return data, err
