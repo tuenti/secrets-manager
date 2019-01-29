@@ -22,7 +22,7 @@ RUN make build-linux
 
 # Stage 1
 # Build actual docker image
-FROM alpine
+FROM alpine:3.8
 ARG PROJECT_SLUG=github.com/tuenti/secrets-manager
 LABEL maintainer="sre@tuenti.com"
 COPY --from=0 /go/src/$PROJECT_SLUG/build/secrets-manager /secrets-manager
