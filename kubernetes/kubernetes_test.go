@@ -23,7 +23,7 @@ import (
 )
 
 func TestUpsertSecretDoesNotExist(t *testing.T) {
-	secretUpdateErrorCount.Reset()
+	secretUpdateErrorsTotal.Reset()
 	client := fake.NewSimpleClientset()
 
 	k8s := New(client, log.New())
@@ -35,12 +35,12 @@ func TestUpsertSecretDoesNotExist(t *testing.T) {
 	secret, _ := client.CoreV1().Secrets("ns").Get("secret-test", metav1.GetOptions{})
 
 	assert.NotNil(t, secret)
-	metricSecretUpdateErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorCount))
+	metricSecretUpdateErrorsTotal, _ := secretUpdateErrorsTotal.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorsTotal))
 }
 
 func TestUpsertSecretAlreadyExists(t *testing.T) {
-	secretUpdateErrorCount.Reset()
+	secretUpdateErrorsTotal.Reset()
 	// Create the fake client.
 	client := fake.NewSimpleClientset()
 
@@ -60,8 +60,8 @@ func TestUpsertSecretAlreadyExists(t *testing.T) {
 	actions := client.Actions()
 	lastAction := actions[len(actions)-1]
 	assert.Implements(t, (*clientgotesting.UpdateAction)(nil), lastAction, "Last action must be UpdateAction")
-	metricSecretUpdateErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorCount))
+	metricSecretUpdateErrorsTotal, _ := secretUpdateErrorsTotal.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretUpdateErrorsTotal))
 }
 
 func TestReadConfigMap(t *testing.T) {
@@ -91,7 +91,7 @@ func TestReadConfigMap(t *testing.T) {
 }
 
 func TestReadSecret(t *testing.T) {
-	secretReadErrorCount.Reset()
+	secretReadErrorsTotal.Reset()
 	client := fake.NewSimpleClientset()
 
 	k8s := New(client, log.New())
@@ -117,12 +117,12 @@ func TestReadSecret(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, secret)
 	assert.Equal(t, "some-value", string(secret["some-key"]))
-	metricSecretReadErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorCount))
+	metricSecretReadErrorsTotal, _ := secretUpdateErrorsTotal.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 }
 
 func TestReadSecretNotFound(t *testing.T) {
-	secretReadErrorCount.Reset()
+	secretReadErrorsTotal.Reset()
 	client := fake.NewSimpleClientset()
 
 	k8s := New(client, log.New())
@@ -130,12 +130,12 @@ func TestReadSecretNotFound(t *testing.T) {
 	secret, err := k8s.ReadSecret("ns", "secret-test")
 	assert.EqualError(t, err, fmt.Sprintf("[%s] secret '%s/%s' not found", secretsManagerErrors.K8sSecretNotFoundErrorType, "ns", "secret-test"))
 	assert.Empty(t, secret)
-	metricSecretReadErrorCount, _ := secretUpdateErrorCount.GetMetricWithLabelValues("secret-test", "ns")
-	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorCount))
+	metricSecretReadErrorsTotal, _ := secretUpdateErrorsTotal.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 0.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 }
 
 func TestReadSecretError(t *testing.T) {
-	secretReadErrorCount.Reset()
+	secretReadErrorsTotal.Reset()
 
 	client := fake.NewSimpleClientset()
 	client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("*", "*", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -146,6 +146,6 @@ func TestReadSecretError(t *testing.T) {
 	secret, err := k8s.ReadSecret("ns", "secret-test")
 	assert.Empty(t, secret)
 	assert.NotNil(t, err)
-	metricSecretReadErrorCount, _ := secretReadErrorCount.GetMetricWithLabelValues("secret-test", "ns")
-	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorCount))
+	metricSecretReadErrorsTotal, _ := secretReadErrorsTotal.GetMetricWithLabelValues("secret-test", "ns")
+	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
 }
