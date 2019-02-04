@@ -129,6 +129,7 @@ func (s *SecretManager) syncState(secret SecretDefinition) error {
 		logger.Errorf("unable to get desired state for secret '%s' : %v", secret.Name, err)
 		for _, namespace := range secret.Namespaces {
 			secretSyncErrorsTotal.WithLabelValues(secret.Name, namespace).Inc()
+			secretLastSyncStatus.WithLabelValues(secret.Name, namespace).Set(0.0)
 		}
 		return err
 	}
@@ -137,6 +138,7 @@ func (s *SecretManager) syncState(secret SecretDefinition) error {
 		if err != nil && !errors.IsK8sSecretNotFound(err) {
 			logger.Errorf("unable to get current state of secret '%s/%s' : %v", namespace, secret.Name, err)
 			secretSyncErrorsTotal.WithLabelValues(secret.Name, namespace).Inc()
+			secretLastSyncStatus.WithLabelValues(secret.Name, namespace).Set(0.0)
 			// If we fail to read from Kubernetes, we keep trying with another namespace
 			continue
 		}
@@ -146,9 +148,11 @@ func (s *SecretManager) syncState(secret SecretDefinition) error {
 			if err := s.upsertSecret(secret.Type, namespace, secret.Name, desiredState); err != nil {
 				log.Errorf("unable to upsert secret %s/%s: %v", namespace, secret.Name, err)
 				secretSyncErrorsTotal.WithLabelValues(secret.Name, namespace).Inc()
+				secretLastSyncStatus.WithLabelValues(secret.Name, namespace).Set(0.0)
 				continue
 			}
 			logger.Infof("secret '%s/%s' updated", namespace, secret.Name)
+			secretLastSyncStatus.WithLabelValues(secret.Name, namespace).Set(1.0)
 		}
 	}
 	return nil

@@ -111,6 +111,7 @@ data:
 |`secrets_manager_k8s_secret_update_errors_total`| Counter | Error total count when updating (and also creating) a secret in Kubernetes | `"name", "namespace"` |
 | `secrets_manager_secret_sync_errors_total`| Counter |Secrets synchronization total errors.|`"name", "namespace"`|
 |`secrets_manager_secret_last_updated`| Gauge |The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)|`"name", "namespace"`|
+|`secrets_manager_secret_last_sync_status`| Gauge |The result of the last sync of a secret. 1 = OK, 0 = Error|`"name", "namespace"`|
 
 ## Getting Started with Vault
 

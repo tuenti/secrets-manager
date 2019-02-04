@@ -2,6 +2,7 @@
 
 ### Added 
 - New `secrets_manager_vault_max_token_ttl` metric, so a user could alert based on this and `secrets_manager_token_ttl`
+- New `secrets_manager_secret_last_sync_status` metric, that shows wether the secret succeded or not in last synchronization iteration
   
 ### Fixed
 - Deprecates `secrets_manager_vault_token_expired` metric as it was quite confusing since it's not really possible for `secrets-manager` to know when the token it's expired, just when it's "close to expire".
