@@ -1,3 +1,14 @@
+## v0.2.0-rc.2 - 2019-01-29
+
+### Added 
+- New `secrets_manager_vault_max_token_ttl` metric, so a user could alert based on this and `secrets_manager_token_ttl`
+- New `secrets_manager_secret_last_sync_status` metric, that shows wether the secret succeded or not in last synchronization iteration
+  
+### Fixed
+- Deprecates `secrets_manager_vault_token_expired` metric as it was quite confusing since it's not really possible for `secrets-manager` to know when the token it's expired, just when it's "close to expire".
+- Renames counter metrics to follow the Prometheus naming standard with the `_total` suffix instead of `_count`.
+- Simplifies prometheus token renewal metrics by merging `secrets_manager_vault_token_lookup_errors_count` and `secrets_manager_vault_token_renew_errors_count` into one single metric `secrets_manager_vault_token_renewal_errors_total` with one more dimension called `vault_operation` which will be one of `lookup-self, renew-self, is-renewable`.
+
 ## v0.2.0-rc.1 - 2019-01-21
 
 ### Added
