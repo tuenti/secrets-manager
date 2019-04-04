@@ -26,4 +26,6 @@ FROM alpine:3.8
 ARG PROJECT_SLUG=github.com/tuenti/secrets-manager
 LABEL maintainer="sre@tuenti.com"
 COPY --from=builder /go/src/$PROJECT_SLUG/build/secrets-manager /secrets-manager
+RUN apk update
+RUN apk add ca-certificates
 ENTRYPOINT ["/secrets-manager"]
