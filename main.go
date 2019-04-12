@@ -51,10 +51,10 @@ func main() {
 	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 
 	flag.StringVar(&secretsManagerCfg.ConfigMap, "config.config-map", "secrets-manager-config", "Name of the config Map with Secrets Manager settings (format: [<namespace>/]<name>) ")
-	flag.DurationVar(&secretsManagerCfg.BackendScrapeInterval, "config.backend-timeout", 5*time.Second, "Backend connection timeout")
 	flag.DurationVar(&secretsManagerCfg.BackendScrapeInterval, "config.backend-scrape-interval", 15*time.Second, "Scraping secrets from backend interval")
 	flag.DurationVar(&secretsManagerCfg.ConfigMapRefreshInterval, "config.configmap-refresh-interval", 15*time.Second, "ConfigMap refresh interval")
 
+	flag.DurationVar(&backendCfg.BackendTimeout, "config.backend-timeout", 5*time.Second, "Backend connection timeout")
 	flag.StringVar(&backendCfg.VaultURL, "vault.url", "https://127.0.0.1:8200", "Vault address. VAULT_ADDR environment would take precedence.")
 	flag.StringVar(&backendCfg.VaultToken, "vault.token", "", "Vault token. VAULT_TOKEN environment would take precedence.")
 	flag.Int64Var(&backendCfg.VaultMaxTokenTTL, "vault.max-token-ttl", 300, "Max seconds to consider a token expired.")
