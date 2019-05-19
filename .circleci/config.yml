@@ -4,7 +4,7 @@ version: 2.0
 jobs:
   unit_tests:
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.12.5
     working_directory: /go/src/github.com/tuenti/secrets-manager
 
     steps:
