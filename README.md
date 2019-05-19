@@ -91,7 +91,8 @@ data:
 | `config.config-map`| 15s | Name of the configmap with *secrets-manager* settings (format: `namespace/name`)  (default "secrets-manager-config") |
 | `config.configmap-refresh-interval`| 15s | ConfigMap refresh interval |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
-| `vault.token` | `""` | Vault token. `VAULT_TOKEN` environment would take precedence. |
+| `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
+| `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
 | `vault.engine` | kv2 | Vault secrets engine to use. Only key/value engines supported. Default is kv version 2 |
 | `vault.max-token-ttl` | 300 |Max seconds to consider a token expired. |
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
@@ -141,17 +142,24 @@ $ cat my-policy.hcl | vault policy write my-policy -
 
 Vault tokens will be renewed by `secrets-manager` if the `ttl` is lower than `vault.max-token-ttl` and the token is renewable. But as per Vault's [documentation](https://www.vaultproject.io/docs/concepts/tokens.html#the-general-case), regular tokens will have their own max TTL that it's calculated on every renewal, so that a token will eventually expire. This can be ok for your use case, but for others a [periodic token](https://www.vaultproject.io/docs/concepts/tokens.html#periodic-tokens) could be much more convinient. In the case of a periodic token, the `period` will invalidate the `vault.renew-ttl-increment` option.
 
-To create a regular token attached to a policy:
 
-`$ vault token create -ttl=1h -policy=my-policy`
+### Vault AppRole
+Vault token as a login mechanism has been deprecated in favor of the [AppRole](https://www.vaultproject.io/docs/auth/approle.html) authentication method for `secrets-manager`. 
+`secrets-manager` will still renew the token obtained after login in, but will make `secrets-manager` more resilient in case of a token has expired due to network issues, Vault sealed, etc.
 
-To create a periodic token you can create a token role as follows:
+So instead of expecting a token, `secrets-manager` expects a `role_id` and a `secret_id` to connect to Vault.
 
-`$ vault write auth/token/roles/secrets-manager allowed_policies=my-policy period=1h`
+To create a role with a permanent `secret_id` attached to a policy:
 
-And then generate a token associated to that role
+`$ vault write auth/approle/role/secrets-manager policies=my-policy secret_id_num_uses=0 secret_id_ttl=0`
 
-`$ vault token create -role="secrets-manager`
+To get a `secret_id`:
+
+`$ vault write -force auth/approle/role/secrets-manager/secret-id`
+
+To get the `role_id`:
+
+`$ vault read auth/approle/role/secrets-manager/role-id`
 
 ## Deployment
 *secrets-manager* has been designed to be deployed in Kubernetes as it reads its config file from Kubernetes Configmap. Future versions of *secrets-manager* may use Custom Resource Definitions instead. You will find a full deployment example in the [examples/](examples) folder.
