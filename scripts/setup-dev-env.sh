@@ -2,6 +2,7 @@
 
 # Download tools
 go get -v github.com/golang/mock/gomock
+go get -v github.com/golang/mock/mockgen
 go get -v github.com/Masterminds/glide
 
 # Install mockgen
