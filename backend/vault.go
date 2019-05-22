@@ -36,7 +36,7 @@ func (c *client) vaultLogin() error {
 	}
 	resp, err := c.logical.Write("auth/approle/login", appRole)
 	if err != nil {
-		logger.Errorf("unable to login: %v", err)
+		logger.Errorf("unable to login to Vault: %v", err)
 		return err
 	}
 	c.vclient.SetToken(resp.Auth.ClientToken)
