@@ -4,6 +4,9 @@
 - Enable Vault AppRole auth method and `secrets-manager` will try to re-login every time it fails to fetch the token. This will make `secrets-manager` more resilient to issues connecting to Vault that potentially caused the token to expire.
 - New `secrets_manager_login_errors_total` Prometheus metric.
 
+### Fixes
+- [#27-Implement AppRole auth](https://github.com/tuenti/secrets-manager/issues/27)
+
 ### Breaking changes
 - Token based login won't be supported, as re-login with and invalid token won't make `secrets-manager` to self-heal.
 - This makes this new version not backward compatible with previous v0.2.0
