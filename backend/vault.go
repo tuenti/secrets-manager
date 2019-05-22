@@ -21,10 +21,26 @@ const defaultSecretKey = "data"
 type client struct {
 	vclient            *api.Client
 	logical            *api.Logical
+	roleID             string
+	secretID           string
 	maxTokenTTL        int64
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
+}
+
+func (c *client) vaultLogin() error {
+	appRole := map[string]interface{}{
+		"role_id":   c.roleID,
+		"secret_id": c.secretID,
+	}
+	resp, err := c.logical.Write("auth/approle/login", appRole)
+	if err != nil {
+		logger.Errorf("unable to login to Vault: %v", err)
+		return err
+	}
+	c.vclient.SetToken(resp.Auth.ClientToken)
+	return nil
 }
 
 func vaultClient(l *log.Logger, cfg Config) (*client, error) {
@@ -44,7 +60,31 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 		return nil, err
 	}
 
-	vclient.SetToken(cfg.VaultToken)
+	logical := vclient.Logical()
+
+	engine, err := newEngine(cfg.VaultEngine)
+	if err != nil {
+		logger.Debugf("unable to use engine %s: %v", cfg.VaultEngine, err)
+		return nil, err
+	}
+
+	client := client{
+		vclient:            vclient,
+		logical:            logical,
+		roleID:             cfg.VaultRoleID,
+		secretID:           cfg.VaultSecretID,
+		maxTokenTTL:        cfg.VaultMaxTokenTTL,
+		tokenPollingPeriod: cfg.VaultTokenPollingPeriod,
+		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
+		engine:             engine,
+	}
+
+	err = client.vaultLogin()
+	if err != nil {
+		logger.Debugf("unable to login with provided credentials: %v", err)
+		return nil, err
+	}
+
 	sys := vclient.Sys()
 	health, err := sys.Health()
 
@@ -54,24 +94,8 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 	}
 
 	logger.Infof("successfully logged into Vault cluster %s", health.ClusterName)
-	logical := vclient.Logical()
-
-	engine, err := newEngine(cfg.VaultEngine)
-	if err != nil {
-		logger.Debugf("unable to use engine %s: %v", cfg.VaultEngine, err)
-		return nil, err
-	}
 
 	metrics = newVaultMetrics(cfg.VaultURL, health.Version, cfg.VaultEngine, health.ClusterID, health.ClusterName)
-
-	client := client{
-		vclient:            vclient,
-		logical:            logical,
-		maxTokenTTL:        cfg.VaultMaxTokenTTL,
-		tokenPollingPeriod: cfg.VaultTokenPollingPeriod,
-		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
-		engine:             engine,
-	}
 
 	metrics.updateVaultMaxTokenTTLMetric(cfg.VaultMaxTokenTTL)
 
@@ -125,6 +149,10 @@ func (c *client) renewalLoop() {
 	token, err := c.getToken()
 	if err != nil {
 		logger.Errorf("failed to fetch token: %v", err)
+		logger.Warnf("trying to login again")
+		if err = c.vaultLogin(); err != nil {
+			metrics.updateVaultLoginErrorsTotalMetric()
+		}
 		return
 	}
 	ttl, err := c.getTokenTTL(token)

@@ -21,7 +21,8 @@ func init() {
 type Config struct {
 	BackendTimeout          time.Duration
 	VaultURL                string
-	VaultToken              string
+	VaultRoleID             string
+	VaultSecretID           string
 	VaultMaxTokenTTL        int64
 	VaultTokenPollingPeriod time.Duration
 	VaultRenewTTLIncrement  int

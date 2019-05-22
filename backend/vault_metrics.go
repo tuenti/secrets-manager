@@ -38,6 +38,12 @@ var (
 		Name:      "read_secret_errors_total",
 		Help:      "Vault read operations counter",
 	}, append(vaultLabelNames, secretLabelNames...))
+	loginErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "secrets_manager",
+		Subsystem: "vault",
+		Name:      "login_errors_total",
+		Help:      "Vault login errors counter",
+	}, vaultLabelNames)
 )
 
 type vaultMetrics struct {
@@ -49,6 +55,7 @@ func init() {
 	prometheus.MustRegister(maxTokenTTL)
 	prometheus.MustRegister(tokenRenewalErrorsTotal)
 	prometheus.MustRegister(secretReadErrorsTotal)
+	prometheus.MustRegister(loginErrorsTotal)
 }
 
 func newVaultMetrics(vaultAddr string, vaultVersion string, vaultEngine string, vaultClusterID string, vaultClusterName string) *vaultMetrics {
@@ -101,4 +108,13 @@ func (vm *vaultMetrics) updateVaultTokenRenewalErrorsTotalMetric(vaultOperation 
 		vm.vaultLabels["vault_cluster_name"],
 		vaultOperation,
 		errorType).Inc()
+}
+
+func (vm *vaultMetrics) updateVaultLoginErrorsTotalMetric() {
+	loginErrorsTotal.WithLabelValues(
+		vm.vaultLabels["vault_addr"],
+		vm.vaultLabels["vault_engine"],
+		vm.vaultLabels["vault_version"],
+		vm.vaultLabels["vault_cluster_id"],
+		vm.vaultLabels["vault_cluster_name"]).Inc()
 }

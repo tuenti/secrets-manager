@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/backend"
 	k8s "github.com/tuenti/secrets-manager/kubernetes"
-	"github.com/tuenti/secrets-manager/secrets-manager"
+	secretsmanager "github.com/tuenti/secrets-manager/secrets-manager"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -56,7 +56,8 @@ func main() {
 
 	flag.DurationVar(&backendCfg.BackendTimeout, "config.backend-timeout", 5*time.Second, "Backend connection timeout")
 	flag.StringVar(&backendCfg.VaultURL, "vault.url", "https://127.0.0.1:8200", "Vault address. VAULT_ADDR environment would take precedence.")
-	flag.StringVar(&backendCfg.VaultToken, "vault.token", "", "Vault token. VAULT_TOKEN environment would take precedence.")
+	flag.StringVar(&backendCfg.VaultRoleID, "vault.role-id", "", "Vault approle role id. VAULT_ROLE_ID environment would take precedence.")
+	flag.StringVar(&backendCfg.VaultRoleID, "vault.secret-id", "", "Vault approle secret id. VAULT_SECRET_ID environment would take precedence.")
 	flag.Int64Var(&backendCfg.VaultMaxTokenTTL, "vault.max-token-ttl", 300, "Max seconds to consider a token expired.")
 	flag.DurationVar(&backendCfg.VaultTokenPollingPeriod, "vault.token-polling-period", 15*time.Second, "Polling interval to check token expiration time.")
 	flag.IntVar(&backendCfg.VaultRenewTTLIncrement, "vault.renew-ttl-increment", 600, "TTL time for renewed token.")
@@ -94,8 +95,12 @@ func main() {
 		backendCfg.VaultURL = os.Getenv("VAULT_ADDR")
 	}
 
-	if os.Getenv("VAULT_TOKEN") != "" {
-		backendCfg.VaultToken = os.Getenv("VAULT_TOKEN")
+	if os.Getenv("VAULT_ROLE_ID") != "" {
+		backendCfg.VaultRoleID = os.Getenv("VAULT_ROLE_ID")
+	}
+
+	if os.Getenv("VAULT_SECRET_ID") != "" {
+		backendCfg.VaultSecretID = os.Getenv("VAULT_SECRET_ID")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

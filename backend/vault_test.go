@@ -24,15 +24,20 @@ const (
 	vaultFakeVersion      = "0.11.1"
 	selectedBackend       = "vault"
 	fakeToken             = "fake-token"
+	vaultFakeRoleID       = "12345678-9aaa-bbbb-cccc-dddddddddddd"
+	vaultFakeSecretID     = "eeeeeeee-ffff-0000-1111-123456789aaa"
 	defaultTokenTTL       = 40
 	defaultTokenRenewable = true
 	defaultRevokedToken   = false
+	defaultInvalidAppRole = false
 )
 
 type testConfig struct {
-	tokenTTL       int
-	tokenRenewable bool
-	tokenRevoked   bool
+	tokenTTL        int
+	tokenRenewable  bool
+	tokenRevoked    bool
+	invalidRoleID   bool
+	invalidSecretID bool
 }
 
 var (
@@ -153,6 +158,56 @@ func v1AuthTokenRenewSelf(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func v1AuthAppRoleLogin(w http.ResponseWriter, r *http.Request) {
+	var response interface{}
+	jsonData := ""
+	if !testCfg.invalidRoleID && !testCfg.invalidSecretID {
+		jsonData = fmt.Sprintf(`
+		{
+  			"request_id": "ecc0025f-040a-3c28-164e-0651abd7f6ac",
+  			"lease_id": "",
+  			"renewable": false,
+			"lease_duration": 0,
+			"data": null,
+			"wrap_info": null,
+			"warnings": null,
+			"auth": {
+				"client_token": "%s",
+				"accessor": "AEuaibYaTmrB44ZG6QjRpv0o",
+				"policies": [
+				"default",
+				"secrets-manager"
+				],
+				"token_policies": [
+				"default",
+				"secrets-manager"
+				],
+				"metadata": {
+				"role_name": "secrets-manager"
+				},
+				"lease_duration": 1200,
+				"renewable": true,
+				"entity_id": "79619c25-955d-2888-7abf-52bf4b87ae94",
+				"token_type": "service",
+				"orphan": true
+			}
+
+		}`, fakeToken)
+	} else if testCfg.invalidRoleID {
+		jsonData = `{"errors":["invalid role ID"]}`
+		w.WriteHeader(http.StatusBadRequest)
+	} else {
+		jsonData = `{"errors":["invalid secret ID"]}`
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	if err := json.Unmarshal([]byte(jsonData), &response); err != nil {
+		fmt.Printf("unable to unmarshal json %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 func v1SecretTestKv2(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := `
@@ -216,6 +271,7 @@ func TestVaultBackendInvalidCfg(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Nil(t, client)
 }
+
 func TestVaultBackend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -223,6 +279,27 @@ func TestVaultBackend(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
 }
+
+func TestVaultLoginInvalidRoleId(t *testing.T) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.invalidRoleID = true
+	client, err := vaultClient(nil, vaultCfg)
+	assert.Nil(t, client)
+	assert.NotNil(t, err)
+	testCfg.invalidRoleID = defaultInvalidAppRole
+}
+
+func TestVaultLoginInvalidSecretId(t *testing.T) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.invalidSecretID = true
+	client, err := vaultClient(nil, vaultCfg)
+	assert.Nil(t, client)
+	assert.NotNil(t, err)
+	testCfg.invalidSecretID = defaultInvalidAppRole
+}
+
 func TestVaultClient(t *testing.T) {
 	maxTokenTTL.Reset()
 	client, err := vaultClient(nil, vaultCfg)
@@ -233,7 +310,7 @@ func TestVaultClient(t *testing.T) {
 }
 
 func TestVaultClientInvalidCfg(t *testing.T) {
-	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1 * time.Second}
+	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", VaultRoleID: vaultFakeRoleID, VaultSecretID: vaultFakeSecretID, BackendTimeout: 1 * time.Second}
 	client, err := vaultClient(nil, invalidCfg)
 	assert.NotNil(t, err)
 	assert.Nil(t, client)
@@ -337,6 +414,40 @@ func TestRenewalLoopNotRenewableToken(t *testing.T) {
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
+func TestRenewalLoopInvalidRoleId(t *testing.T) {
+	client, _ := vaultClient(nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.invalidRoleID = true
+	testCfg.tokenRevoked = true
+
+	tokenRenewalErrorsTotal.Reset()
+	loginErrorsTotal.Reset()
+	client.renewalLoop()
+	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(loginErrorsTotal))
+	testCfg.invalidRoleID = defaultInvalidAppRole
+	testCfg.tokenRevoked = defaultRevokedToken
+}
+
+func TestRenewalLoopInvalidSecretId(t *testing.T) {
+	client, _ := vaultClient(nil, vaultCfg)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.invalidSecretID = true
+	testCfg.tokenRevoked = true
+
+	tokenRenewalErrorsTotal.Reset()
+	loginErrorsTotal.Reset()
+	client.renewalLoop()
+	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(loginErrorsTotal))
+	testCfg.invalidSecretID = defaultInvalidAppRole
+	testCfg.tokenRevoked = defaultRevokedToken
+}
+
 func TestReadSecretKv2(t *testing.T) {
 	client, _ := vaultClient(nil, vaultCfg)
 	secretValue, err := client.ReadSecret("/secret/data/test", "foo")
@@ -375,6 +486,7 @@ func TestMain(m *testing.M) {
 	v1SysHandler.HandleFunc("/health", v1SysHealth).Methods("GET")
 	v1AuthHandler.HandleFunc("/token/lookup-self", v1AuthTokenLookupSelf).Methods("GET")
 	v1AuthHandler.HandleFunc("/token/renew-self", v1AuthTokenRenewSelf).Methods("PUT")
+	v1AuthHandler.HandleFunc("/approle/login", v1AuthAppRoleLogin).Methods("PUT")
 	v1SecretHandler.HandleFunc("/data/test", v1SecretTestKv2).Methods("GET")
 	v1SecretHandler.HandleFunc("/test", v1SecretTestKv1).Methods("GET")
 
@@ -383,15 +495,18 @@ func TestMain(m *testing.M) {
 
 	vaultCfg = Config{
 		VaultURL:                string(server.URL),
-		VaultToken:              fakeToken,
+		VaultRoleID:             vaultFakeRoleID,
+		VaultSecretID:           vaultFakeSecretID,
 		VaultTokenPollingPeriod: 1,
 		VaultEngine:             "kv2",
 	}
 
 	testCfg = &testConfig{
-		tokenRenewable: defaultTokenRenewable,
-		tokenTTL:       defaultTokenTTL,
-		tokenRevoked:   defaultRevokedToken,
+		tokenRenewable:  defaultTokenRenewable,
+		tokenTTL:        defaultTokenTTL,
+		tokenRevoked:    defaultRevokedToken,
+		invalidRoleID:   defaultInvalidAppRole,
+		invalidSecretID: defaultInvalidAppRole,
 	}
 
 	os.Exit(m.Run())
