@@ -7,7 +7,8 @@ jobs:
     - image: circleci/golang:1.12.5
       environment:
         GO111MODULE: "ON"
-        GOPATH: "/go"
+    environment:
+      GOPATH: "/go"
     working_directory: /go/src/github.com/tuenti/secrets-manager
 
     steps:
@@ -23,7 +24,8 @@ jobs:
     - image: circleci/golang:1.12.5
       environment:
         GO111MODULE: "ON"
-        GOPATH: "/go"
+    environment:
+      GOPATH: "/go"
     working_directory: /go/src/github.com/tuenti/secrets-manager
 
     steps:
@@ -36,7 +38,8 @@ jobs:
     - image: circleci/golang:1.12.5
       environment:
         GO111MODULE: "ON"
-        GOPATH: "/go"
+    environment:
+      GOPATH: "/go"
     working_directory: /go/src/github.com/tuenti/secrets-manager
 
     steps:
