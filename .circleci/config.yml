@@ -10,7 +10,6 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker
-    - run: make init test
     - run: make docker-build # try to build docker image as a test
     - run: 
         command: bash <(curl -s https://codecov.io/bash)
@@ -24,7 +23,7 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker
-    - run: make init docker-build
+    - run: make docker-build
   
   docker_hub_release_tags:
     docker:

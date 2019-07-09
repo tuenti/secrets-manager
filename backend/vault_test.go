@@ -11,10 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/tuenti/secrets-manager/errors"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -45,6 +47,7 @@ var (
 	server   *httptest.Server
 	mutex    sync.Mutex
 	testCfg  *testConfig
+	logger   logr.Logger
 )
 
 func v1SysHealth(w http.ResponseWriter, r *http.Request) {
@@ -265,9 +268,9 @@ func v1SecretTestKv1(w http.ResponseWriter, r *http.Request) {
 func TestVaultBackendInvalidCfg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cfg := Config{VaultURL: "http://1.1.1.1:8300", BackendTimeout: 1}
+	cfg := Config{VaultURL: "http://1.1.1.1:8300", VaultEngine: "kv3", BackendTimeout: 1}
 	backend := "vault"
-	client, err := NewBackendClient(ctx, backend, nil, cfg)
+	client, err := NewBackendClient(ctx, backend, logger, cfg)
 	assert.NotNil(t, err)
 	assert.Nil(t, client)
 }
@@ -275,7 +278,7 @@ func TestVaultBackendInvalidCfg(t *testing.T) {
 func TestVaultBackend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client, err := NewBackendClient(ctx, "vault", nil, vaultCfg)
+	client, err := NewBackendClient(ctx, "vault", logger, vaultCfg)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
 }
@@ -284,7 +287,7 @@ func TestVaultLoginInvalidRoleId(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.invalidRoleID = true
-	client, err := vaultClient(nil, vaultCfg)
+	client, err := vaultClient(logger, vaultCfg)
 	assert.Nil(t, client)
 	assert.NotNil(t, err)
 	testCfg.invalidRoleID = defaultInvalidAppRole
@@ -294,7 +297,7 @@ func TestVaultLoginInvalidSecretId(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.invalidSecretID = true
-	client, err := vaultClient(nil, vaultCfg)
+	client, err := vaultClient(logger, vaultCfg)
 	assert.Nil(t, client)
 	assert.NotNil(t, err)
 	testCfg.invalidSecretID = defaultInvalidAppRole
@@ -302,7 +305,7 @@ func TestVaultLoginInvalidSecretId(t *testing.T) {
 
 func TestVaultClient(t *testing.T) {
 	maxTokenTTL.Reset()
-	client, err := vaultClient(nil, vaultCfg)
+	client, err := vaultClient(logger, vaultCfg)
 	metricMaxTokenTTL, _ := maxTokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
@@ -311,20 +314,20 @@ func TestVaultClient(t *testing.T) {
 
 func TestVaultClientInvalidCfg(t *testing.T) {
 	invalidCfg := Config{VaultURL: "http://1.1.1.1:8300", VaultRoleID: vaultFakeRoleID, VaultSecretID: vaultFakeSecretID, BackendTimeout: 1 * time.Second}
-	client, err := vaultClient(nil, invalidCfg)
+	client, err := vaultClient(logger, invalidCfg)
 	assert.NotNil(t, err)
 	assert.Nil(t, client)
 }
 
 func TestGetToken(t *testing.T) {
-	client, err := vaultClient(nil, vaultCfg)
+	client, err := vaultClient(logger, vaultCfg)
 	token, err := client.getToken()
 	assert.NotNil(t, token)
 	assert.Nil(t, err)
 }
 
 func TestGetTokenTTL(t *testing.T) {
-	client, err := vaultClient(nil, vaultCfg)
+	client, err := vaultClient(logger, vaultCfg)
 	tokenTTL.Reset()
 
 	token, err := client.getToken()
@@ -337,7 +340,7 @@ func TestGetTokenTTL(t *testing.T) {
 }
 
 func TestRenewToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = true
@@ -351,7 +354,7 @@ func TestRenewToken(t *testing.T) {
 }
 
 func TestRenewTokenRevokedToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = true
@@ -368,7 +371,7 @@ func TestRenewTokenRevokedToken(t *testing.T) {
 }
 
 func TestTokenNotRenewableError(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
@@ -387,7 +390,7 @@ func TestTokenNotRenewableError(t *testing.T) {
 }
 
 func TestRenewalLoopRevokedToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRevoked = true
@@ -399,7 +402,7 @@ func TestRenewalLoopRevokedToken(t *testing.T) {
 }
 
 func TestRenewalLoopNotRenewableToken(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.tokenRenewable = false
@@ -415,7 +418,7 @@ func TestRenewalLoopNotRenewableToken(t *testing.T) {
 }
 
 func TestRenewalLoopInvalidRoleId(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.invalidRoleID = true
@@ -432,7 +435,7 @@ func TestRenewalLoopInvalidRoleId(t *testing.T) {
 }
 
 func TestRenewalLoopInvalidSecretId(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
 	testCfg.invalidSecretID = true
@@ -449,7 +452,7 @@ func TestRenewalLoopInvalidSecretId(t *testing.T) {
 }
 
 func TestReadSecretKv2(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	secretValue, err := client.ReadSecret("/secret/data/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
@@ -459,14 +462,14 @@ func TestReadSecretKv1(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	vaultCfg.VaultEngine = "kv1"
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	secretValue, err := client.ReadSecret("/secret/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
 }
 
 func TestSecretNotFound(t *testing.T) {
-	client, _ := vaultClient(nil, vaultCfg)
+	client, _ := vaultClient(logger, vaultCfg)
 	path := "/secret/data/test"
 	key := "foo2"
 	secretReadErrorsTotal.Reset()
@@ -508,6 +511,8 @@ func TestMain(m *testing.M) {
 		invalidRoleID:   defaultInvalidAppRole,
 		invalidSecretID: defaultInvalidAppRole,
 	}
+
+	logger = zap.Logger(false).WithName("vault-test")
 
 	os.Exit(m.Run())
 }

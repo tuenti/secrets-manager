@@ -1,6 +1,10 @@
 package backend
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
+)
 
 const (
 	vaultLookupSelfOperationName  = "lookup-self"
@@ -14,31 +18,31 @@ var (
 	vaultErrorLabelNames = []string{"vault_operation", "error"}
 
 	// Prometeheus metrics: https://prometheus.io
-	tokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	tokenTTL = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "token_ttl",
 		Help:      "Vault token TTL",
 	}, vaultLabelNames)
-	maxTokenTTL = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	maxTokenTTL = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "max_token_ttl",
 		Help:      "secrets-manager max Vault token TTL",
 	}, vaultLabelNames)
-	tokenRenewalErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	tokenRenewalErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "token_renewal_errors_total",
 		Help:      "Vault token renewal errors counter",
 	}, append(vaultLabelNames, vaultErrorLabelNames...))
-	secretReadErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	secretReadErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "read_secret_errors_total",
 		Help:      "Vault read operations counter",
 	}, append(vaultLabelNames, secretLabelNames...))
-	loginErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	loginErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "vault",
 		Name:      "login_errors_total",
@@ -51,11 +55,12 @@ type vaultMetrics struct {
 }
 
 func init() {
-	prometheus.MustRegister(tokenTTL)
-	prometheus.MustRegister(maxTokenTTL)
-	prometheus.MustRegister(tokenRenewalErrorsTotal)
-	prometheus.MustRegister(secretReadErrorsTotal)
-	prometheus.MustRegister(loginErrorsTotal)
+	r := metrics.Registry
+	r.MustRegister(tokenTTL)
+	r.MustRegister(maxTokenTTL)
+	r.MustRegister(tokenRenewalErrorsTotal)
+	r.MustRegister(secretReadErrorsTotal)
+	r.MustRegister(loginErrorsTotal)
 }
 
 func newVaultMetrics(vaultAddr string, vaultVersion string, vaultEngine string, vaultClusterID string, vaultClusterName string) *vaultMetrics {

@@ -1,0 +1,7 @@
+version: "2"
+domain: secrets-manager.tuenti.io
+repo: github.com/tuenti/secrets-manager
+resources:
+- group: secretsmanager
+  version: v1alpha1
+  kind: SecretDefinition

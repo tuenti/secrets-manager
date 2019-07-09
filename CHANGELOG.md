@@ -1,3 +1,19 @@
+## v1.0.0-snapshot-1 2019-07-09
+
+### Added
+- `SecretDefinitions` created via `CustomResourceDefinitions`
+- If the `SecretDefinion` gets deleted, the corresponding secret will be removed too.
+- New zap logger based on [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) project. Use `-enable-debug-log` to get a more verbose output.
+### Fixes
+- [#2 Switch to custom resource definitions instead of a single configmap](https://github.com/tuenti/secrets-manager/issues/2)
+- [#8 Secrets deletion proposal](https://github.com/tuenti/secrets-manager/issues/8)
+
+### Breaking changes
+- congimaps won't be supported to define secrets, and so that won't work all the relevant configmap flags.
+- log.format and log.level flags won't work anymore, as we have changed the logger to addapt to the [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) project. Use `-enable-debug-log` to get a more verbose output.
+- `config.backend-scrape-interval` no longer works as we check the backend state on every reconcile event. Use `reconcile-period` instead
+- `listen-address` removed in favor of `metrics-addr`
+
 ## v1.0.0-snapshot 2019-05-22
 
 ### Added

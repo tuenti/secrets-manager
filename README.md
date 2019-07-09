@@ -20,63 +20,46 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 
 - [vault-crd](https://github.com/DaspawnW/vault-crd). This is the tool that really inspired *secrets-manager*. We opened this [issue](https://github.com/DaspawnW/vault-crd/issues/4) asking for token renewal or other login mechanism. While the author is very responsive answering, we could not wait for an implementation and since we were more used to Go than Java we decided to write *secrets-manager*. We are very thankful to the author of *vault-crd*, since has been really inspiring. Some differences:
   - *vault-crd* uses Hashicorp Vault as the source of truth, while *secrets-manager* has been designed to support other backends (we only support Vault for now,though).
-  - *vault-crd* uses [Custom Resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) while *secrets-manager* uses configmaps. Configmap was the very first step, but we will migrate it to CRDs as part of our short-term roadmap.
   - *vault-crd* supports KV1 and pki engines, while *secrets-manager* supports KV1 and KV2. It is also in our roadmap to support more engines.
 
 # How it works
 
-*secrets-manager* gets initialized with a Vault token and a Kubernetes configmap. While it's running it will be checking in the background:
+*secrets-manager* will login to Vault using AppRole credentials and it will start a reconciliation loop watching for changes in `SecretsDefinition` objects. In background it will run two main operations: 
 
-- If Vault token is close to expire and if that's the case, renewing it.
-- The Kubernetes configmap data, reloading the mounted config file in case there is any change.
+- If Vault token is close to expire and if that's the case, renewing it. If it can't renew, it will try to re-login.
+- It will re-queue `SecretsDefinition` events and in every event loop it will verify if the current Kubernetes secret it is in the desired state by comparing it with the data in Vault and creating/updating them accordingly
 
+## Custom Resource Definition (CRD)
 
-## Configmap
+*secrets-manager* now uses [Custom Resource Definitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) to extend Kubernetes APIs with a new `SecretDefinition` object that it will watch.
 
-*secrets-manager* configmap looks like the following example:
+To install the CRD in your cluster: `kubectl apply -f crd.yaml`
 
 ```
-apiVersion: v1
-kind: ConfigMap
+---
+apiVersion: secrets-manager.tuenti.io/v1alpha1
+kind: SecretDefinition
 metadata:
-  name: secrets-manager-configmap
-  namespace: secrets-manager
-data:
-  secretDefinitions: |-
-    - data:
-        tls.crt:
-          encoding: base64
-          key: crt
-          path: secret/data/tls-example-io
-        tls.key:
-          encoding: base64
-          path: secret/data/tls-example-io
-          key: key
-      name: tls-example-io
-      namespaces:
-      - example
-      type: kubernetes.io/tls
-    - data:
-        dbuser:
-          key: user
-          path: secret/data/db-credentials
-        dbpassword:
-          key: password
-          path: secret/data/db-credentials
-      name: db-credentials
-      namespaces:
-      - webapp
-      - foo
-      - bar
-      type: Opaque
+  name: secretdefinition-sample
+spec:
+  # Add fields here
+  name: supersecretnew
+  keysMap:
+    decoded:
+      path: secret/data/pathtosecret1
+      encoding: base64
+      key: value
+    raw:
+      path: secret/data/pathtosecret1
+      key: value
+
 ```
 
 ### Secrets Definition
 
 - `name`: This will be the name of the secret created in Kubernetes.
-- `namespaces`: A list of namespaces where the secret has to be created.
 - `type`: Kubernetes secret type. One of `kubernetes.io/tls`, `Opaque`.
-- `data`: This will contain the Kubernetes secret data keys as a map of datasources. Each datasource will contain the way to access the secret in the secret backend source of truth, via a `path` and `key`. And optional `encoding` key can be provided if your secrets are stored in `base64`. The absence of `encoding` or `encoding: text` means no encoding.
+- `keysMap`: This will contain the Kubernetes secret data keys as a map of datasources. Each datasource will contain the way to access the secret in the secret backend source of truth, via a `path` and  a `key`. And optional `encoding` key can be provided if your secrets are codified in `base64`. The absence of `encoding` or `encoding: text` means no encoding.
 
 **NOTE**: We let the user all the responsibility to set the whole Vault path. So it is important to know which path a secret engine needs to be set. For instance, with the KV version 1 all secrets are stored in `secret/` whereas with the KV version 2, all secrets go under `secret/data/`
 
@@ -84,13 +67,11 @@ data:
 
 | Flag | Default | Description |
 | ------ | ------- | ------ |
-| `log.level` | warn | Minimum log level |
-| `log.format` | text | Log format, one of text or json |
 | `backend`| vault | Selected backend. Only vault supported for now |
+| `enable-debug-log` | `false` | Enable this to get more logs verbosity and debug messages.|
+| `enable-leader-election` | `false` | Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.|
+| `reconcile-period`| 5s | How often the controller will re-queue secretdefinition events |
 | `config.backend-timeout`| 5s | Backend connection timeout |
-| `config.backend-scrape-interval`| 15s | Scraping secrets from backend interval |
-| `config.config-map`| 15s | Name of the configmap with *secrets-manager* settings (format: `namespace/name`)  (default "secrets-manager-config") |
-| `config.configmap-refresh-interval`| 15s | ConfigMap refresh interval |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
 | `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
@@ -98,7 +79,7 @@ data:
 | `vault.max-token-ttl` | 300 |Max seconds to consider a token expired. |
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
-| `listen-address` | `:8080` | The address to listen on for HTTP requests. |
+| `metrics-addr` | `:8080` | The address to listen on for HTTP requests. |
 
 ## Prometheus Metrics
 
@@ -163,7 +144,7 @@ To get the `role_id`:
 `$ vault read auth/approle/role/secrets-manager/role-id`
 
 ## Deployment
-*secrets-manager* has been designed to be deployed in Kubernetes as it reads its config file from Kubernetes Configmap. Future versions of *secrets-manager* may use Custom Resource Definitions instead. You will find a full deployment example in the [examples/](examples) folder.
+*secrets-manager* has been designed to be deployed in Kubernetes, you will find a full deployment example in the [config/samples](config/samples) folder.
 
 ## Credits & Contact
 
