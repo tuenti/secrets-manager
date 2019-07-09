@@ -1,7 +1,7 @@
 DOCKER_REGISTRY ?= "registry.hub.docker.com"
 BINARY_NAME=secrets-manager
 SECRETS_MANAGER_VERSION=v1.0.0-snapshot-1
-
+GO111MODULE=on
 # Image URL to use all building/pushing image targets
 IMG = ${DOCKER_REGISTRY}/${BINARY_NAME}:${SECRETS_MANAGER_VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
@@ -50,7 +50,6 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	#docker build -t ${IMG} .
 	docker build --build-arg SECRETS_MANAGER_VERSION=${SECRETS_MANAGER_VERSION} -t ${IMG} .
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
