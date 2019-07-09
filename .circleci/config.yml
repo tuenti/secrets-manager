@@ -39,7 +39,7 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker
-    - run: make init docker-build
+    - run: make docker-build
 
 workflows:
   version: 2
