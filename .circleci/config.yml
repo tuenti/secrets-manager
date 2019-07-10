@@ -5,12 +5,6 @@ jobs:
   unit_tests:
     docker:
     - image: circleci/golang:1.12.5
-      environment:
-        GO111MODULE: "ON"
-        GOPATH: "/go"
-        PATH: "$PATH:$GOPATH/bin"
-    working_directory: /go/src/github.com/tuenti/secrets-manager
-
     steps:
     - checkout
     - setup_remote_docker
@@ -22,12 +16,6 @@ jobs:
   docker_hub_master:
     docker:
     - image: circleci/golang:1.12.5
-      environment:
-        GO111MODULE: "ON"
-        GOPATH: "/go"
-        PATH: "$PATH:$GOPATH/bin"
-    working_directory: /github.com/tuenti/secrets-manager
-
     steps:
     - checkout
     - setup_remote_docker
@@ -36,12 +24,6 @@ jobs:
   docker_hub_release_tags:
     docker:
     - image: circleci/golang:1.12.5
-      environment:
-        GO111MODULE: "ON"
-        GOPATH: "/go"
-        PATH: "$PATH:$GOPATH/bin"
-    working_directory: ~/github.com/tuenti/secrets-manager
-
     steps:
     - checkout
     - setup_remote_docker
