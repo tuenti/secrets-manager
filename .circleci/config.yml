@@ -5,9 +5,15 @@ jobs:
   unit_tests:
     docker:
     - image: circleci/golang:1.12.5
+    environment:
+      KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
     steps:
     - checkout
     - setup_remote_docker
+    - run: curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-alpha.4/kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: tar -zxvf kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: mv kubebuilder_2.0.0-alpha.4_linux_amd64 kubebuilder && sudo mv kubebuilder /usr/local/
+    - run: export PATH=$PATH:/usr/local/kubebuilder/bin
     - run: make docker-build # try to build docker image as a test
     - run:
         command: bash <(curl -s https://codecov.io/bash)
@@ -16,17 +22,29 @@ jobs:
   docker_hub_master:
     docker:
     - image: circleci/golang:1.12.5
+    environment:
+      KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
     steps:
     - checkout
     - setup_remote_docker
+    - run: curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-alpha.4/kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: tar -zxvf kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: mv kubebuilder_2.0.0-alpha.4_linux_amd64 kubebuilder && sudo mv kubebuilder /usr/local/
+    - run: export PATH=$PATH:/usr/local/kubebuilder/bin
     - run: make docker-build
 
   docker_hub_release_tags:
     docker:
     - image: circleci/golang:1.12.5
+    environment:
+      KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
     steps:
     - checkout
     - setup_remote_docker
+    - run: curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-alpha.4/kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: tar -zxvf kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+    - run: mv kubebuilder_2.0.0-alpha.4_linux_amd64 kubebuilder && sudo mv kubebuilder /usr/local/
+    - run: export PATH=$PATH:/usr/local/kubebuilder/bin
     - run: make docker-build
 
 workflows:
