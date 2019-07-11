@@ -4,17 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/vault/api"
-	log "github.com/sirupsen/logrus"
 	"github.com/tuenti/secrets-manager/errors"
 )
 
-var (
-	logger  *log.Logger
-	metrics *vaultMetrics
-)
+var vMetrics *vaultMetrics
 
 const defaultSecretKey = "data"
 
@@ -27,6 +25,7 @@ type client struct {
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
+	logger             logr.Logger
 }
 
 func (c *client) vaultLogin() error {
@@ -36,19 +35,16 @@ func (c *client) vaultLogin() error {
 	}
 	resp, err := c.logical.Write("auth/approle/login", appRole)
 	if err != nil {
-		logger.Errorf("unable to login to Vault: %v", err)
 		return err
 	}
 	c.vclient.SetToken(resp.Auth.ClientToken)
 	return nil
 }
 
-func vaultClient(l *log.Logger, cfg Config) (*client, error) {
-	if l != nil {
-		logger = l
-	} else {
-		logger = log.New()
-	}
+func vaultClient(l logr.Logger, cfg Config) (*client, error) {
+	logger := l.WithName("vault").WithValues(
+		"vault_url", cfg.VaultURL,
+		"vault_engine", cfg.VaultEngine)
 
 	httpClient := new(http.Client)
 	httpClient.Timeout = cfg.BackendTimeout
@@ -56,7 +52,7 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 	vclient, err := api.NewClient(&api.Config{Address: cfg.VaultURL, HttpClient: httpClient})
 
 	if err != nil {
-		logger.Debugf("unable to build vault client: %v", err)
+		logger.Error(err, "unable to create vault api client")
 		return nil, err
 	}
 
@@ -64,7 +60,7 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 
 	engine, err := newEngine(cfg.VaultEngine)
 	if err != nil {
-		logger.Debugf("unable to use engine %s: %v", cfg.VaultEngine, err)
+		logger.Error(err, "unable to setup vault engine")
 		return nil, err
 	}
 
@@ -81,7 +77,7 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 
 	err = client.vaultLogin()
 	if err != nil {
-		logger.Debugf("unable to login with provided credentials: %v", err)
+		logger.Error(err, "unable to login to vault with provided credentials")
 		return nil, err
 	}
 
@@ -89,15 +85,25 @@ func vaultClient(l *log.Logger, cfg Config) (*client, error) {
 	health, err := sys.Health()
 
 	if err != nil {
-		logger.Debugf("could not contact Vault at %s: %v ", cfg.VaultURL, err)
+		logger.Error(err, "could not get health information about vault cluster")
 		return nil, err
 	}
 
-	logger.Infof("successfully logged into Vault cluster %s", health.ClusterName)
+	logger = logger.WithValues(
+		"vault_cluster_name", health.ClusterName,
+		"vault_cluster_id", health.ClusterID,
+		"vault_version", health.Version,
+		"vault_sealed", strconv.FormatBool(health.Sealed),
+		"vault_server_time_utc", health.ServerTimeUTC,
+	)
 
-	metrics = newVaultMetrics(cfg.VaultURL, health.Version, cfg.VaultEngine, health.ClusterID, health.ClusterName)
+	logger.Info("successfully logged into vault cluster")
 
-	metrics.updateVaultMaxTokenTTLMetric(cfg.VaultMaxTokenTTL)
+	client.logger = logger
+
+	vMetrics = newVaultMetrics(cfg.VaultURL, health.Version, cfg.VaultEngine, health.ClusterID, health.ClusterName)
+
+	vMetrics.updateVaultMaxTokenTTLMetric(cfg.VaultMaxTokenTTL)
 
 	return &client, err
 }
@@ -106,8 +112,7 @@ func (c *client) getToken() (*api.Secret, error) {
 	auth := c.vclient.Auth()
 	lookup, err := auth.Token().LookupSelf()
 	if err != nil {
-		logger.Errorf("error checking token with lookup self api: %v", err)
-		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultLookupSelfOperationName, errors.UnknownErrorType)
+		vMetrics.updateVaultTokenRenewalErrorsTotalMetric(vaultLookupSelfOperationName, errors.UnknownErrorType)
 		return nil, err
 	}
 	return lookup, nil
@@ -117,29 +122,26 @@ func (c *client) getTokenTTL(token *api.Secret) (int64, error) {
 	var ttl int64
 	ttl, err := token.Data["ttl"].(json.Number).Int64()
 	if err != nil {
-		logger.Errorf("couldn't decode ttl from token: %v", err)
 		return -1, err
 	}
-	metrics.updateVaultTokenTTLMetric(ttl)
+	vMetrics.updateVaultTokenTTLMetric(ttl)
 	return ttl, nil
 }
 
 func (c *client) renewToken(token *api.Secret) error {
 	isRenewable, err := token.TokenIsRenewable()
 	if err != nil {
-		logger.Errorf("could not check token renewability: %v", err)
-		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.UnknownErrorType)
+		vMetrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.UnknownErrorType)
 		return err
 	}
 	if !isRenewable {
-		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
+		vMetrics.updateVaultTokenRenewalErrorsTotalMetric(vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 		err = &errors.VaultTokenNotRenewableError{ErrType: errors.VaultTokenNotRenewableErrorType}
 		return err
 	}
 	auth := c.vclient.Auth()
 	if _, err = auth.Token().RenewSelf(c.renewTTLIncrement); err != nil {
-		log.Errorf("failed to renew token: %v", err)
-		metrics.updateVaultTokenRenewalErrorsTotalMetric(vaultRenewSelfOperationName, errors.UnknownErrorType)
+		vMetrics.updateVaultTokenRenewalErrorsTotalMetric(vaultRenewSelfOperationName, errors.UnknownErrorType)
 		return err
 	}
 	return nil
@@ -148,24 +150,25 @@ func (c *client) renewToken(token *api.Secret) error {
 func (c *client) renewalLoop() {
 	token, err := c.getToken()
 	if err != nil {
-		logger.Errorf("failed to fetch token: %v", err)
-		logger.Warnf("trying to login again")
+		c.logger.Error(err, "unable to get vault token")
+		c.logger.Info("trying to login to vault again")
 		if err = c.vaultLogin(); err != nil {
-			metrics.updateVaultLoginErrorsTotalMetric()
+			vMetrics.updateVaultLoginErrorsTotalMetric()
 		}
+		c.logger.Info("login successful, got a new vault token")
 		return
 	}
 	ttl, err := c.getTokenTTL(token)
 	if err != nil {
-		logger.Errorf("failed to read token TTL: %v", err)
+		c.logger.Error(err, "failed to read vault token TTL")
 		return
 	} else if ttl < c.maxTokenTTL {
-		logger.Warnf("token is really close to expire, current ttl: %d", ttl)
+		c.logger.Info("vault token is really close to expire", "vault_token_ttl", ttl)
 		err := c.renewToken(token)
 		if err != nil {
-			logger.Errorf("could not renew token: %v", err)
+			c.logger.Error(err, "failed to renew vault token")
 		} else {
-			logger.Infoln("token renewed successfully!")
+			c.logger.Info("vault token renewed successfully!")
 		}
 	} else {
 		return
@@ -180,7 +183,7 @@ func (c *client) startTokenRenewer(ctx context.Context) {
 				c.renewalLoop()
 				break
 			case <-ctx.Done():
-				logger.Infoln("gracefully shutting down token renewal go routine")
+				c.logger.Info("gracefully shutting down token renewal go routine")
 				return
 			}
 		}
@@ -196,7 +199,7 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 	logical := c.logical
 	secret, err := logical.Read(path)
 	if err != nil {
-		metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.UnknownErrorType)
+		vMetrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.UnknownErrorType)
 		return data, err
 	}
 
@@ -207,18 +210,18 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 			if secretData[key] != nil {
 				data = secretData[key].(string)
 			} else {
-				metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
+				vMetrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 				err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 			}
 		} else {
 			for _, w := range warnings {
-				logger.Warningln(w)
+				c.logger.Info("secret contains warnings", "vault_secret_warning", w)
 			}
-			metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
+			vMetrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 			err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 		}
 	} else {
-		metrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
+		vMetrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.BackendSecretNotFoundErrorType)
 		err = &errors.BackendSecretNotFoundError{ErrType: errors.BackendSecretNotFoundErrorType, Path: path, Key: key}
 	}
 	return data, err

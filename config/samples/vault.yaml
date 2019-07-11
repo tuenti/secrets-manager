@@ -1,0 +1,51 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels:
+    app: vault
+spec:
+  ports:
+    - name: vault
+      port: 8200
+      targetPort: 8200
+      protocol: TCP
+  selector:
+    app: vault
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: vault
+  name: vault
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vault
+    spec:
+      containers:
+      - image: vault
+        name: vault
+        command:
+        - vault
+        args:
+        - server
+        - -dev
+        - -dev-listen-address=0.0.0.0:8200
+        ports:
+        - containerPort: 8200
+          name: vaultport
+          protocol: TCP
+        volumeMounts:
+        - name: root-home
+          mountPath: /root
+        env:
+        - name: VAULT_ADDR
+          value: http://localhost:8200
+      volumes:
+      - name: root-home
+        emptyDir: {}

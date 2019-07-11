@@ -1,57 +1,69 @@
-
-# Binary names
-BUILD_FOLDER=build
-BINARY_NAME=secrets-manager
-SECRETS_MANAGER_VERSION=v1.0.0-snapshot
 DOCKER_REGISTRY ?= "registry.hub.docker.com"
-DOCKER_IMAGE_NAME=${BINARY_NAME}
-DOCKER_IMAGE=${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${SECRETS_MANAGER_VERSION}
+BINARY_NAME=secrets-manager
+SECRETS_MANAGER_VERSION=v1.0.0-snapshot-1
+GO111MODULE=on
+# Image URL to use all building/pushing image targets
+IMG = ${DOCKER_REGISTRY}/${BINARY_NAME}:${SECRETS_MANAGER_VERSION}
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:trivialVersions=true"
+
 BUILD_FLAGS=-ldflags "-X main.version=${SECRETS_MANAGER_VERSION}"
 
-pkgs   = $(shell go list ./... | grep -v /vendor/)
+all: manager
 
-.PHONY: init
-init:
-	scripts/setup-dev-env.sh
-	glide install
+# Run tests
+test: generate fmt vet manifests
+	go test -v ./backend... ./errors/... ./controllers/... -coverprofile cover.out
 
-.PHONY: build-linux
-build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${BUILD_FLAGS} -o ${BUILD_FOLDER}/${BINARY_NAME} -v
+# Build manager binary
+manager: generate fmt vet
+	go build ${BUILD_FLAGS} -o bin/${BINARY_NAME} main.go
 
-.PHONY: docker-build
-docker-build:
-	docker build --build-arg SECRETS_MANAGER_VERSION=${SECRETS_MANAGER_VERSION} -t ${DOCKER_IMAGE} .
+# Run against the configured Kubernetes cluster in ~/.kube/config
+run: generate fmt vet
+	go run ./main.go
 
-.PHONY: docker-push
-docker-push: docker-build
-	docker login ${DOCKER_REGISTRY}
-	docker push ${DOCKER_IMAGE}
+# Install CRDs into a cluster
+install: manifests
+	kubectl apply -f config/crd/bases
 
-.PHONY: test
-test: mocks
-	mkdir -p ${BUILD_FOLDER}
-	go test -coverprofile=${BUILD_FOLDER}/coverage.txt ./... 
-	go tool cover -html=${BUILD_FOLDER}/coverage.txt -o ${BUILD_FOLDER}/coverage.html
-	go tool cover -func=${BUILD_FOLDER}/coverage.txt
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: manifests
+	kubectl apply -f config/crd/bases
+	kustomize build config/default | kubectl apply -f -
 
-.PHONY: style
-style:
-	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+# Generate manifests e.g. CRD, RBAC etc.
+manifests: controller-gen
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-.PHONY: format
-format:
-	@echo ">> formatting code"
-	@go fmt $(pkgs)
+# Run go fmt against code
+fmt:
+	go fmt ./...
 
-.PHONY: vet
+# Run go vet against code
 vet:
-	@echo ">> vetting code"
-	@go vet $(pkgs)
+	go vet ./...
 
-mocks:
-	mockgen -package mocks \
-		-destination mocks/kubernetes.go \
-		-source kubernetes/kubernetes.go \
-		-mock_names Client=MockKubernetesClient
+# Generate code
+generate: controller-gen
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./api/...
+
+# Build the docker image
+docker-build: test
+	docker build --build-arg SECRETS_MANAGER_VERSION=${SECRETS_MANAGER_VERSION} -t ${IMG} .
+	@echo "updating kustomize image patch file for manager resource"
+	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+
+# Push the docker image
+docker-push:
+	docker push ${IMG}
+
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.0-beta.2
+CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif

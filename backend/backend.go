@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/tuenti/secrets-manager/errors"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const vaultBackendName = "vault"
@@ -35,7 +34,7 @@ type Client interface {
 }
 
 // NewBackendClient returns and implementation of Client interface, given the selected backend
-func NewBackendClient(ctx context.Context, backend string, logger *log.Logger, cfg Config) (*Client, error) {
+func NewBackendClient(ctx context.Context, backend string, logger logr.Logger, cfg Config) (*Client, error) {
 	var err error
 	var client Client
 
