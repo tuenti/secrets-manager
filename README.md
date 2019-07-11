@@ -1,4 +1,8 @@
-### WARNING: Latest version of `secrets-manager` introduces breaking changes as Vault token based authentication will no longer be supported. Checkout for more information `CHANGELOG.md`. 
+## WARNING: Latest version of `secrets-manager` introduces  two major breaking changes:
+  - Vault token based authentication will no longer be supported in favor of AppRole authentication. 
+  - Configmap-based secret definitions will be deprecated in favor of CRDs.
+Checkout `CHANGELOG.md` for more information. 
+
 # secrets-manager 
 [![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/master.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tuenti/secrets-manager)](https://goreportcard.com/report/github.com/tuenti/secrets-manager)
@@ -18,7 +22,7 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 
 - [vault-operator](https://github.com/coreos/vault-operator). This manages vault clusters in Kubernetes, so it is a completely different tool.
 
-- [vault-crd](https://github.com/DaspawnW/vault-crd). This is the tool that really inspired *secrets-manager*. We opened this [issue](https://github.com/DaspawnW/vault-crd/issues/4) asking for token renewal or other login mechanism. While the author is very responsive answering, we could not wait for an implementation and since we were more used to Go than Java we decided to write *secrets-manager*. We are very thankful to the author of *vault-crd*, since has been really inspiring. Some differences:
+- [vault-crd](https://github.com/DaspawnW/vault-crd). This is the tool that really inspired *secrets-manager*. We opened this [issue](https://github.com/DaspawnW/vault-crd/issues/4) asking for token renewal or other login mechanism. While the author is very responsive answering, we could not wait for an implementation and since we were are more familiar with Go than Java we decided to write *secrets-manager*. We are very thankful to the author of *vault-crd*, since it has been really inspiring. Some differences:
   - *vault-crd* uses Hashicorp Vault as the source of truth, while *secrets-manager* has been designed to support other backends (we only support Vault for now,though).
   - *vault-crd* supports KV1 and pki engines, while *secrets-manager* supports KV1 and KV2. It is also in our roadmap to support more engines.
 
@@ -35,7 +39,19 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 
 To install the CRD in your cluster: `kubectl apply -f crd.yaml`
 
+
+### Secrets Definition
+
+- `name`: This will be the name of the secret created in Kubernetes.
+- `type`: Kubernetes secret type. One of `kubernetes.io/tls`, `Opaque`.
+- `keysMap`: This will contain the Kubernetes secret data keys as a map of datasources. Each datasource will contain the way to access the secret in the secret backend source of truth, via a `path` and  a `key`. And optional `encoding` key can be provided if your secrets are codified in `base64`. The absence of `encoding` or `encoding: text` means no encoding.
+
+**NOTE**: We let the user all the responsibility to set the whole Vault path. So it is important to know which path a secret engine needs to be set. For instance, with the KV version 1 all secrets are stored in `secret/` whereas with the KV version 2, all secrets go under `secret/data/`
+
+An example of a `secretdefinition` object
+
 ```
+$ cat > secretdefinition-sample.yaml <<EOF
 ---
 apiVersion: secrets-manager.tuenti.io/v1alpha1
 kind: SecretDefinition
@@ -53,16 +69,10 @@ spec:
       path: secret/data/pathtosecret1
       key: value
 
+EOF
 ```
 
-### Secrets Definition
-
-- `name`: This will be the name of the secret created in Kubernetes.
-- `type`: Kubernetes secret type. One of `kubernetes.io/tls`, `Opaque`.
-- `keysMap`: This will contain the Kubernetes secret data keys as a map of datasources. Each datasource will contain the way to access the secret in the secret backend source of truth, via a `path` and  a `key`. And optional `encoding` key can be provided if your secrets are codified in `base64`. The absence of `encoding` or `encoding: text` means no encoding.
-
-**NOTE**: We let the user all the responsibility to set the whole Vault path. So it is important to know which path a secret engine needs to be set. For instance, with the KV version 1 all secrets are stored in `secret/` whereas with the KV version 2, all secrets go under `secret/data/`
-
+To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 ## Flags
 
 | Flag | Default | Description |
