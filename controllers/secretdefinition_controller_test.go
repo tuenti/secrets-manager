@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 
-	//"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	secretsmanagerv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
+	smv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
 	"github.com/tuenti/secrets-manager/errors"
 
-	//corev1 "k8s.io/api/core/v1"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,16 +24,16 @@ const (
 var _ = Describe("SecretsManager", func() {
 	var (
 		r  *SecretDefinitionReconciler
-		sd = &secretsmanagerv1alpha1.SecretDefinition{
+		sd = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secretdef-test",
 			},
-			Spec: secretsmanagerv1alpha1.SecretDefinitionSpec{
+			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-test",
 				Type: "Opaque",
-				KeysMap: map[string]secretsmanagerv1alpha1.DataSource{
-					"foo": secretsmanagerv1alpha1.DataSource{
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"foo": smv1alpha1.DataSource{
 						Path:     "secret/data/pathtosecret1",
 						Key:      "value",
 						Encoding: "base64",
@@ -43,16 +41,16 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sd2 = &secretsmanagerv1alpha1.SecretDefinition{
+		sd2 = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secretdef-test2",
 			},
-			Spec: secretsmanagerv1alpha1.SecretDefinitionSpec{
+			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-test2",
 				Type: "Opaque",
-				KeysMap: map[string]secretsmanagerv1alpha1.DataSource{
-					"foo2": secretsmanagerv1alpha1.DataSource{
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"foo2": smv1alpha1.DataSource{
 						Path:     "secret/data/pathtosecret1",
 						Key:      "value",
 						Encoding: "base64",
@@ -60,16 +58,16 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sdBackendSecretNotFound = &secretsmanagerv1alpha1.SecretDefinition{
+		sdBackendSecretNotFound = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secretdef-beckend-secret-not-found",
 			},
-			Spec: secretsmanagerv1alpha1.SecretDefinitionSpec{
+			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-backend-secret-not-found",
 				Type: "Opaque",
-				KeysMap: map[string]secretsmanagerv1alpha1.DataSource{
-					"foo3": secretsmanagerv1alpha1.DataSource{
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"foo3": smv1alpha1.DataSource{
 						Path:     "secret/data/notfound",
 						Key:      "value",
 						Encoding: "base64",
@@ -77,16 +75,16 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sdWrongEncoding = &secretsmanagerv1alpha1.SecretDefinition{
+		sdWrongEncoding = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secretdef-wrong-encoding",
 			},
-			Spec: secretsmanagerv1alpha1.SecretDefinitionSpec{
+			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-wrong-encoding",
 				Type: "Opaque",
-				KeysMap: map[string]secretsmanagerv1alpha1.DataSource{
-					"foo4": secretsmanagerv1alpha1.DataSource{
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"foo4": smv1alpha1.DataSource{
 						Path:     "secret/data/pathtosecret1",
 						Key:      "value",
 						Encoding: "base65",
