@@ -28,7 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	secretsmanagerv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
+	smv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
 	"github.com/tuenti/secrets-manager/backend"
 )
 
@@ -76,8 +76,13 @@ func ignoreNotFoundError(err error) error {
 	return err
 }
 
+// isNotMarkedForRemoval will determine if the SecretDefinition object has been marked to be deleted
+func isNotMarkedForRemoval(sDef smv1alpha1.SecretDefinition) bool {
+	return sDef.ObjectMeta.DeletionTimestamp.IsZero()
+}
+
 // getDesiredState reads the content from the Datasource for later comparison
-func (r *SecretDefinitionReconciler) getDesiredState(keysMap map[string]secretsmanagerv1alpha1.DataSource) (map[string][]byte, error) {
+func (r *SecretDefinitionReconciler) getDesiredState(keysMap map[string]smv1alpha1.DataSource) (map[string][]byte, error) {
 	desiredState := make(map[string][]byte)
 	var err error
 	for k, v := range keysMap {
@@ -119,16 +124,16 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 }
 
 // upsertSecret will create or update a secret
-func (r *SecretDefinitionReconciler) upsertSecret(secretDef *secretsmanagerv1alpha1.SecretDefinition, data map[string][]byte) error {
+func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
 	secret := &corev1.Secret{
-		Type: corev1.SecretType(secretDef.Spec.Type),
+		Type: corev1.SecretType(sDef.Spec.Type),
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: secretDef.Namespace,
+			Namespace: sDef.Namespace,
 			Labels: map[string]string{
 				"managedBy":     "secrets-manager",
 				"lastUpdatedAt": time.Now().Format(timestampFormat),
 			},
-			Name: secretDef.Spec.Name,
+			Name: sDef.Spec.Name,
 		},
 		Data: data,
 	}
@@ -150,43 +155,49 @@ func (r *SecretDefinitionReconciler) deleteSecret(namespace string, name string)
 	return r.Delete(r.Ctx, secret)
 }
 
+// AddFinalizerIfNotPresent will check if finalizerName is the finalizers slice
+func (r *SecretDefinitionReconciler) AddFinalizerIfNotPresent(sDef *smv1alpha1.SecretDefinition, finalizerName string) error {
+	if !containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
+		sDef.ObjectMeta.Finalizers = append(sDef.ObjectMeta.Finalizers, finalizerName)
+		return r.Update(r.Ctx, sDef)
+	}
+	return nil
+}
+
 // +kubebuilder:rbac:groups=secrets-manager.tuenti.io,resources=secretdefinitions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=secrets-manager.tuenti.io,resources=secretdefinitions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("secretdefinition", req.NamespacedName)
 
-	secretDef := &secretsmanagerv1alpha1.SecretDefinition{}
+	sDef := &smv1alpha1.SecretDefinition{}
 
-	err := r.Get(r.Ctx, req.NamespacedName, secretDef)
+	err := r.Get(r.Ctx, req.NamespacedName, sDef)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("could not get SecretDefinition '%s'", req.NamespacedName))
 		return ctrl.Result{}, ignoreNotFoundError(err)
 	}
 
-	secretName := secretDef.Spec.Name
-	secretNamespace := secretDef.Namespace
+	secretName := sDef.Spec.Name
+	secretNamespace := sDef.Namespace
 
 	log = log.WithValues("secret", fmt.Sprintf("%s/%s", secretNamespace, secretName))
 
-	if secretDef.ObjectMeta.DeletionTimestamp.IsZero() {
+	if isNotMarkedForRemoval(*sDef) {
 
-		// Let's add the finalizer if it's not present
-		if !containsString(secretDef.ObjectMeta.Finalizers, finalizerName) {
-			secretDef.ObjectMeta.Finalizers = append(secretDef.ObjectMeta.Finalizers, finalizerName)
-			if err = r.Update(r.Ctx, secretDef); err != nil {
-				log.Error(err, "unable to update SecretDefinition finalizers", "finalizer", finalizerName)
-				return ctrl.Result{}, err
-			}
+		err = r.AddFinalizerIfNotPresent(sDef, finalizerName)
+		if err != nil {
+			log.Error(err, "unable to update SecretDefinition finalizers", "finalizer", finalizerName)
+			return ctrl.Result{}, err
 		}
 
 		// Get data from the secret source of truth
-		desiredState, err := r.getDesiredState(secretDef.Spec.KeysMap)
+		desiredState, err := r.getDesiredState(sDef.Spec.KeysMap)
 
 		if err != nil {
 			log.Error(err, "unable to get desired state for secret")
-			secretSyncErrorsTotal.WithLabelValues(secretName, secretNamespace).Inc()
-			secretLastSyncStatus.WithLabelValues(secretName, secretNamespace).Set(0.0)
+			secretSyncErrorsTotal.WithLabelValues(secretNamespace, secretName).Inc()
+			secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(0.0)
 			return ctrl.Result{}, err
 		}
 
@@ -195,37 +206,37 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 
 		if err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "unable to get current state of secret")
-			secretSyncErrorsTotal.WithLabelValues(secretName, secretNamespace).Inc()
-			secretLastSyncStatus.WithLabelValues(secretName, secretNamespace).Set(0.0)
+			secretSyncErrorsTotal.WithLabelValues(secretNamespace, secretName).Inc()
+			secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(0.0)
 			return ctrl.Result{}, ignoreNotFoundError(err)
 		}
 
 		eq := reflect.DeepEqual(desiredState, currentState)
 		if !eq {
 			log.Info("secret must be updated")
-			if err := r.upsertSecret(secretDef, desiredState); err != nil {
+			if err := r.upsertSecret(sDef, desiredState); err != nil {
 				log.Error(err, "unable to upsert secret")
-				secretSyncErrorsTotal.WithLabelValues(secretName, secretNamespace).Inc()
-				secretLastSyncStatus.WithLabelValues(secretName, secretNamespace).Set(0.0)
+				secretSyncErrorsTotal.WithLabelValues(secretNamespace, secretName).Inc()
+				secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(0.0)
 				return ctrl.Result{}, err
 			}
 			log.Info("secret updated")
-			secretLastSyncStatus.WithLabelValues(secretName, secretNamespace).Set(1.0)
+			secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(1.0)
 		}
 
 		return ctrl.Result{RequeueAfter: r.ReconciliationPeriod}, nil
 
 	} else {
 		// SecretDefinition has been marked for deletion and contains finalizer
-		if containsString(secretDef.ObjectMeta.Finalizers, finalizerName) {
+		if containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
 			if err = r.deleteSecret(secretNamespace, secretName); err != nil {
 				log.Error(err, "unable to delete secret")
 				return ctrl.Result{}, ignoreNotFoundError(err)
 			}
 			log.Info("secret deleted successfully")
 			// If success remove finalizer
-			secretDef.ObjectMeta.Finalizers = removeString(secretDef.ObjectMeta.Finalizers, finalizerName)
-			if err = r.Update(r.Ctx, secretDef); err != nil {
+			sDef.ObjectMeta.Finalizers = removeString(sDef.ObjectMeta.Finalizers, finalizerName)
+			if err = r.Update(r.Ctx, sDef); err != nil {
 				log.Error(err, "unable to remove finalizer from SecretDefinition", "finalizer", finalizerName)
 				return ctrl.Result{}, err
 			}
@@ -237,6 +248,6 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 // SetupWithManager will register the controller
 func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&secretsmanagerv1alpha1.SecretDefinition{}).
+		For(&smv1alpha1.SecretDefinition{}).
 		Complete(r)
 }

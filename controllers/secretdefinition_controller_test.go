@@ -123,6 +123,7 @@ var _ = Describe("SecretsManager", func() {
 			Expect(err3).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"foo": decodedBytes}))
 		})
+
 		It("Delete a secretdefinition should delete a secret", func() {
 			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			err := r.Create(context.Background(), sd2)
@@ -136,6 +137,7 @@ var _ = Describe("SecretsManager", func() {
 
 			Expect(res).ToNot(BeNil())
 			Expect(err2).To(BeNil())
+			Expect(sd2.ObjectMeta.Finalizers).To(BeEmpty())
 
 			data, err3 := r.getCurrentState("default", "secret-test2")
 			Expect(err3).To(BeNil())
