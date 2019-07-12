@@ -1,30 +1,28 @@
-# Stage 0
-# Build binary file
-FROM golang:1.12.5-alpine3.9 as builder
-ENV GLIDE_VERSION v0.13.2
+# Build the manager binary
+FROM golang:1.12.5 as builder
 
-RUN wget "https://github.com/Masterminds/glide/releases/download/${GLIDE_VERSION}/glide-${GLIDE_VERSION}-linux-amd64.tar.gz" \
-    && tar xf glide-${GLIDE_VERSION}-linux-amd64.tar.gz \
-    && cp linux-amd64/glide $GOPATH/bin/ \
-    && chmod +x $GOPATH/bin/glide
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
-RUN apk add --update git make
-
-ARG PROJECT_SLUG=github.com/tuenti/secrets-manager
-COPY glide.yaml /go/src/$PROJECT_SLUG/glide.yaml
-COPY glide.lock /go/src/$PROJECT_SLUG/glide.lock
-WORKDIR /go/src/$PROJECT_SLUG
-RUN glide install
-
-COPY . /go/src/$PROJECT_SLUG
+# Copy the go source
+COPY main.go main.go
+COPY api/ api/
+COPY controllers/ controllers/
+COPY backend/ backend/
+COPY errors/ errors/
 ARG SECRETS_MANAGER_VERSION
-RUN make build-linux
 
-# Stage 1
-# Build actual docker image
-FROM alpine:3.9
-ARG PROJECT_SLUG=github.com/tuenti/secrets-manager
-LABEL maintainer="sre@tuenti.com"
-COPY --from=builder /go/src/$PROJECT_SLUG/build/secrets-manager /secrets-manager
-RUN apk add --update --no-cache ca-certificates && rm -rf /var/cache/apk/*
+# Build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags "-X main.version=${SECRETS_MANAGER_VERSION}" -a -o secrets-manager main.go
+
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:latest
+WORKDIR /
+COPY --from=builder /workspace/secrets-manager .
 ENTRYPOINT ["/secrets-manager"]
