@@ -229,7 +229,7 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 	} else {
 		// SecretDefinition has been marked for deletion and contains finalizer
 		if containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
-			if err = r.deleteSecret(secretNamespace, secretName); err != nil {
+			if err = r.deleteSecret(secretNamespace, secretName); err != nil && !errors.IsNotFound(err) {
 				log.Error(err, "unable to delete secret")
 				return ctrl.Result{}, ignoreNotFoundError(err)
 			}
