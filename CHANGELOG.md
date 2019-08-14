@@ -1,3 +1,7 @@
+## v1.0.1 2019-08-14
+### Fixes
+- Deleting a `SecretDefinition` hangs if the corresponding secret does not exist.
+
 ## v1.0.0 2019-07-29
 Stable release
 
