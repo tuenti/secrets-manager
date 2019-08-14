@@ -16,25 +16,11 @@ var (
 		Help:      "Errors total count when reading a secret from Kubernetes",
 	}, []string{"namespace", "name"})
 
-	secretUpdateErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "secrets_manager",
-		Subsystem: "controller",
-		Name:      "secret_update_errors_total",
-		Help:      "Error total count when updating (and also creating) a secret in Kubernetes",
-	}, []string{"namespace", "name"})
-
 	secretSyncErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "secrets_manager",
 		Subsystem: "controller",
 		Name:      "sync_errors_total",
 		Help:      "Secrets synchronization total errors.",
-	}, []string{"namespace", "name"})
-
-	secretLastUpdated = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "secrets_manager",
-		Subsystem: "controller",
-		Name:      "last_updated",
-		Help:      "The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)",
 	}, []string{"namespace", "name"})
 
 	secretLastSyncStatus = promauto.NewGaugeVec(prometheus.GaugeOpts{
@@ -48,8 +34,6 @@ var (
 func init() {
 	r := metrics.Registry
 	r.MustRegister(secretReadErrorsTotal)
-	r.MustRegister(secretUpdateErrorsTotal)
 	r.MustRegister(secretSyncErrorsTotal)
-	r.MustRegister(secretLastUpdated)
 	r.MustRegister(secretLastSyncStatus)
 }
