@@ -1,3 +1,8 @@
+## v1.0.0 2019-07-29
+Stable release
+
+## v1.0.0-rc.1 2019-07-12
+Release Candidate 1
 ## v1.0.0-snapshot-1 2019-07-09
 
 ### Added
