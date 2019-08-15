@@ -100,11 +100,9 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 |`secrets_manager_vault_max_token_ttl` | Gauge | `secrets-manager` max Vault token TTL | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
 |`secrets_manager_vault_token_ttl` | Gauge | Vault token TTL | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
 |`secrets_manager_vault_token_renewal_errors_total`| Counter | Vault token renewal errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "vault_operation", "error"` |
-|`secrets_manager_k8s_secret_read_errors_total`| Counter | Errors total count when reading a secret from Kubernetes | `"name", "namespace"` |
-|`secrets_manager_k8s_secret_update_errors_total`| Counter | Error total count when updating (and also creating) a secret in Kubernetes | `"name", "namespace"` |
-| `secrets_manager_secret_sync_errors_total`| Counter |Secrets synchronization total errors.|`"name", "namespace"`|
-|`secrets_manager_secret_last_updated`| Gauge |The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)|`"name", "namespace"`|
-|`secrets_manager_secret_last_sync_status`| Gauge |The result of the last sync of a secret. 1 = OK, 0 = Error|`"name", "namespace"`|
+|`secrets_manager_controller_secret_read_errors_total`| Counter | Errors total count when reading a secret from Kubernetes | `"name", "namespace"` |
+| `secrets_manager_controller_sync_errors_total`| Counter |Secrets synchronization total errors.|`"name", "namespace"`|
+|`secrets_manager_controller_last_sync_status`| Gauge |The result of the last sync of a secret. 1 = OK, 0 = Error|`"name", "namespace"`|
 
 ## Getting Started with Vault
 

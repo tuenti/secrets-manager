@@ -1,3 +1,11 @@
+## v1.0.1 2019-08-14
+### Fixes
+- Deleting a `SecretDefinition` hangs if the corresponding secret does not exist.
+- Invalid metric names in README
+
+### Deprecates
+- Unused prometheus metrics `secrets_manager_controller_update_secret_errors_total` and `secrets_manager_controller_last_updated`
+
 ## v1.0.0 2019-07-29
 Stable release
 
