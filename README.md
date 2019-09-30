@@ -1,7 +1,7 @@
 ## WARNING: Latest version of `secrets-manager` introduces  two major breaking changes:
   - Vault token based authentication will no longer be supported in favor of AppRole authentication. 
   - Configmap-based secret definitions will be deprecated in favor of CRDs.
-Checkout `CHANGELOG.md` for more information. 
+Checkout `CHANGELOG.md` for more information.
 
 # secrets-manager 
 [![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/master.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/master)
@@ -90,6 +90,8 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
 | `metrics-addr` | `:8080` | The address to listen on for HTTP requests. |
+| `watch-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will watch for `SecretDefinitions`. By default all namespaces are watched. |
+| `exclude-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will not watch for `SecretDefinitions`. By default all namespaces are watched. |
 
 ## Prometheus Metrics
 
@@ -100,11 +102,9 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 |`secrets_manager_vault_max_token_ttl` | Gauge | `secrets-manager` max Vault token TTL | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
 |`secrets_manager_vault_token_ttl` | Gauge | Vault token TTL | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name"` |
 |`secrets_manager_vault_token_renewal_errors_total`| Counter | Vault token renewal errors counter | `"vault_address", "vault_engine", "vault_version", "vault_cluster_id", "vault_cluster_name", "vault_operation", "error"` |
-|`secrets_manager_k8s_secret_read_errors_total`| Counter | Errors total count when reading a secret from Kubernetes | `"name", "namespace"` |
-|`secrets_manager_k8s_secret_update_errors_total`| Counter | Error total count when updating (and also creating) a secret in Kubernetes | `"name", "namespace"` |
-| `secrets_manager_secret_sync_errors_total`| Counter |Secrets synchronization total errors.|`"name", "namespace"`|
-|`secrets_manager_secret_last_updated`| Gauge |The last update timestamp as a Unix time (the number of seconds elapsed since January 1, 1970 UTC)|`"name", "namespace"`|
-|`secrets_manager_secret_last_sync_status`| Gauge |The result of the last sync of a secret. 1 = OK, 0 = Error|`"name", "namespace"`|
+|`secrets_manager_controller_secret_read_errors_total`| Counter | Errors total count when reading a secret from Kubernetes | `"name", "namespace"` |
+| `secrets_manager_controller_sync_errors_total`| Counter |Secrets synchronization total errors.|`"name", "namespace"`|
+|`secrets_manager_controller_last_sync_status`| Gauge |The result of the last sync of a secret. 1 = OK, 0 = Error|`"name", "namespace"`|
 
 ## Getting Started with Vault
 

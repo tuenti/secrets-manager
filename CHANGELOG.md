@@ -1,3 +1,16 @@
+## v1.0.2-rc.1 2019-09-30
+
+### Fixes
+- [#38 add the ability to watch secretDefinitions scoped to a particular namespace](https://github.com/tuenti/secrets-manager/issues/38)
+
+## v1.0.1 2019-08-14
+### Fixes
+- Deleting a `SecretDefinition` hangs if the corresponding secret does not exist.
+- Invalid metric names in README
+
+### Deprecates
+- Unused prometheus metrics `secrets_manager_controller_update_secret_errors_total` and `secrets_manager_controller_last_updated`
+
 ## v1.0.0 2019-07-29
 Stable release
 
