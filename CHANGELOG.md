@@ -1,3 +1,8 @@
+## v1.0.2-rc.1 2019-09-30
+
+### Fixes
+- [#38 add the ability to watch secretDefinitions scoped to a particular namespace](https://github.com/tuenti/secrets-manager/issues/38)
+
 ## v1.0.1 2019-08-14
 ### Fixes
 - Deleting a `SecretDefinition` hangs if the corresponding secret does not exist.

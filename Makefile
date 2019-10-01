@@ -1,6 +1,6 @@
 DOCKER_REGISTRY ?= "registry.hub.docker.com"
 BINARY_NAME=secrets-manager
-SECRETS_MANAGER_VERSION=v1.0.1
+SECRETS_MANAGER_VERSION=v1.0.2-snapshot-1
 GO111MODULE=on
 # Image URL to use all building/pushing image targets
 IMG = ${DOCKER_REGISTRY}/${BINARY_NAME}:${SECRETS_MANAGER_VERSION}

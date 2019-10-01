@@ -1,7 +1,7 @@
 ## WARNING: Latest version of `secrets-manager` introduces  two major breaking changes:
   - Vault token based authentication will no longer be supported in favor of AppRole authentication. 
   - Configmap-based secret definitions will be deprecated in favor of CRDs.
-Checkout `CHANGELOG.md` for more information. 
+Checkout `CHANGELOG.md` for more information.
 
 # secrets-manager 
 [![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/master.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/master)
@@ -90,6 +90,8 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
 | `metrics-addr` | `:8080` | The address to listen on for HTTP requests. |
+| `watch-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will watch for `SecretDefinitions`. By default all namespaces are watched. |
+| `exclude-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will not watch for `SecretDefinitions`. By default all namespaces are watched. |
 
 ## Prometheus Metrics
 

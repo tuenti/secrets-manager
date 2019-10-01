@@ -36,6 +36,7 @@ const (
 	// https://golang.org/pkg/time/#pkg-constants
 	timestampFormat = "2006-01-02T15.04.05Z"
 	finalizerName   = "secret.finalizer.secrets-manager.tuenti.io"
+	allNamespaces   = "all"
 )
 
 // SecretDefinitionReconciler reconciles a SecretDefinition object
@@ -46,6 +47,7 @@ type SecretDefinitionReconciler struct {
 	Ctx                  context.Context
 	APIReader            client.Reader
 	ReconciliationPeriod time.Duration
+	WatchNamespaces      map[string]bool
 }
 
 // Helper functions to check and remove string from a slice of strings.
@@ -155,6 +157,14 @@ func (r *SecretDefinitionReconciler) deleteSecret(namespace string, name string)
 	return r.Delete(r.Ctx, secret)
 }
 
+// shouldWatch will return true if the secretDefinition is in a watchable namespace
+func (r *SecretDefinitionReconciler) shouldWatch(sDefNamespace string) bool {
+	if len(r.WatchNamespaces) > 0 {
+		return r.WatchNamespaces[sDefNamespace]
+	}
+	return true
+}
+
 // AddFinalizerIfNotPresent will check if finalizerName is the finalizers slice
 func (r *SecretDefinitionReconciler) AddFinalizerIfNotPresent(sDef *smv1alpha1.SecretDefinition, finalizerName string) error {
 	if !containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
@@ -191,6 +201,10 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 			return ctrl.Result{}, err
 		}
 
+		if !r.shouldWatch(sDef.Namespace) {
+			log.Info("outside watched namespaces, ignoring", "watched_namespaces", r.WatchNamespaces)
+			return ctrl.Result{}, nil
+		}
 		// Get data from the secret source of truth
 		desiredState, err := r.getDesiredState(sDef.Spec.KeysMap)
 
