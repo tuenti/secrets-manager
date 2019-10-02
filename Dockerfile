@@ -18,6 +18,8 @@ COPY errors/ errors/
 ARG SECRETS_MANAGER_VERSION
 
 # Build
+RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.0-beta.2
+RUN /go/bin/controller-gen object:headerFile=./hack/boilerplate.go.txt paths=./api/...
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags "-X main.version=${SECRETS_MANAGER_VERSION}" -a -o secrets-manager main.go
 
 # Use distroless as minimal base image to package the manager binary
