@@ -36,7 +36,6 @@ const (
 	// https://golang.org/pkg/time/#pkg-constants
 	timestampFormat = "2006-01-02T15.04.05Z"
 	finalizerName   = "secret.finalizer.secrets-manager.tuenti.io"
-	allNamespaces   = "all"
 )
 
 // SecretDefinitionReconciler reconciles a SecretDefinition object

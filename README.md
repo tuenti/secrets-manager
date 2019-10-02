@@ -91,7 +91,7 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
 | `metrics-addr` | `:8080` | The address to listen on for HTTP requests. |
 | `watch-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will watch for `SecretDefinitions`. By default all namespaces are watched. |
-| `exclude-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will not watch for `SecretDefinitions`. By default all namespaces are watched. |
+| `exclude-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will not watch for `SecretDefinitions`. By default all namespaces are watched. Note that if you exclude and watch the same namespace, excluding it will be prioritized. |
 
 ## Prometheus Metrics
 
