@@ -15,6 +15,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 COPY backend/ backend/
 COPY errors/ errors/
+COPY hack/ hack/
 ARG SECRETS_MANAGER_VERSION
 
 # Build
