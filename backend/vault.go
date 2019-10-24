@@ -154,7 +154,7 @@ func (c *client) renewalLoop() {
 		c.logger.Info("trying to login to vault again")
 		if err = c.vaultLogin(); err != nil {
 			vMetrics.updateVaultLoginErrorsTotalMetric()
-			c.logger.Info("login error, vault token not obtained")
+			c.logger.Error(err, "login error, vault token not obtained")
 		} else {
 			c.logger.Info("login successful, got a new vault token")
 		}
