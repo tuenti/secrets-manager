@@ -154,14 +154,15 @@ func (c *client) renewalLoop() {
 		c.logger.Info("trying to login to vault again")
 		if err = c.vaultLogin(); err != nil {
 			vMetrics.updateVaultLoginErrorsTotalMetric()
+		} else {
+			c.logger.Info("login successful, got a new vault token")
 		}
-		c.logger.Info("login successful, got a new vault token")
 		return
 	}
+
 	ttl, err := c.getTokenTTL(token)
 	if err != nil {
 		c.logger.Error(err, "failed to read vault token TTL")
-		return
 	} else if ttl < c.maxTokenTTL {
 		c.logger.Info("vault token is really close to expire", "vault_token_ttl", ttl)
 		err := c.renewToken(token)
@@ -170,9 +171,8 @@ func (c *client) renewalLoop() {
 		} else {
 			c.logger.Info("vault token renewed successfully!")
 		}
-	} else {
-		return
 	}
+	return
 }
 
 func (c *client) startTokenRenewer(ctx context.Context) {
