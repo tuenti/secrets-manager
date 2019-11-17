@@ -1,3 +1,11 @@
+## v1.0.2 2019-11-17
+
+Stable release. Adds watching specific namespaces (see v1.0.2-rc.1) and some minor fixes.
+
+### Fixes
+- [#47 missing return provokes wrong metrics delivery](https://github.com/tuenti/secrets-manager/issues/47)
+- [#37 Unable to build 1.0.1](https://github.com/tuenti/secrets-manager/issues/37)
+
 ## v1.0.2-rc.1 2019-09-30
 
 ### Fixes
