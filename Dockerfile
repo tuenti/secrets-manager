@@ -29,4 +29,4 @@ FROM gcr.io/distroless/static:latest
 WORKDIR /
 COPY --from=builder /workspace/secrets-manager .
 ENTRYPOINT ["/secrets-manager"]
-USER 1000
+USER nobody
