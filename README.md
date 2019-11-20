@@ -1,8 +1,3 @@
-## WARNING: Latest version of `secrets-manager` introduces  two major breaking changes:
-  - Vault token based authentication will no longer be supported in favor of AppRole authentication. 
-  - Configmap-based secret definitions will be deprecated in favor of CRDs.
-Checkout `CHANGELOG.md` for more information.
-
 # secrets-manager 
 [![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/master.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tuenti/secrets-manager)](https://goreportcard.com/report/github.com/tuenti/secrets-manager)
