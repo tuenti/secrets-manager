@@ -18,8 +18,8 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 - [vault-operator](https://github.com/coreos/vault-operator). This manages vault clusters in Kubernetes, so it is a completely different tool.
 
 - [vault-crd](https://github.com/DaspawnW/vault-crd). This is the tool that really inspired *secrets-manager*. We opened this [issue](https://github.com/DaspawnW/vault-crd/issues/4) asking for token renewal or other login mechanism. While the author is very responsive answering, we could not wait for an implementation and since we were are more familiar with Go than Java we decided to write *secrets-manager*. We are very thankful to the author of *vault-crd*, since it has been really inspiring. Some differences:
-  - *vault-crd* uses Hashicorp Vault as the source of truth, while *secrets-manager* has been designed to support other backends (we only support Vault for now,though).
-  - *vault-crd* supports KV1 and pki engines, while *secrets-manager* supports KV1 and KV2. It is also in our roadmap to support more engines.
+  - *vault-crd* only supports Hashicorp Vault as its secrets manager, while *secrets-manager* has been designed to support other backends (we only support Vault for now, though).
+  - *vault-crd* supports KV1, KV2 and PKI secret engines. *secrets-manager* supports KV1 and KV2. It is on our roadmap to support more secret engines.
 
 # How it works
 
