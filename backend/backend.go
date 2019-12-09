@@ -26,6 +26,7 @@ type Config struct {
 	VaultTokenPollingPeriod time.Duration
 	VaultRenewTTLIncrement  int
 	VaultEngine             string
+	VaultApprolePath        string
 }
 
 // Client interface represent a backend client interface that should be implemented
