@@ -1,4 +1,4 @@
-# secrets-manager 
+# secrets-manager
 [![CircleCI](https://circleci.com/gh/tuenti/secrets-manager/tree/master.svg?style=svg)](https://circleci.com/gh/tuenti/secrets-manager/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tuenti/secrets-manager)](https://goreportcard.com/report/github.com/tuenti/secrets-manager)
 [![codecov](https://codecov.io/gh/tuenti/secrets-manager/branch/master/graph/badge.svg)](https://codecov.io/gh/tuenti/secrets-manager)
@@ -23,7 +23,7 @@ Lots of companies use [Vault](https://www.vaultproject.io) as their secrets stor
 
 # How it works
 
-*secrets-manager* will login to Vault using AppRole credentials and it will start a reconciliation loop watching for changes in `SecretsDefinition` objects. In background it will run two main operations: 
+*secrets-manager* will login to Vault using AppRole credentials and it will start a reconciliation loop watching for changes in `SecretsDefinition` objects. In background it will run two main operations:
 
 - If Vault token is close to expire and if that's the case, renewing it. If it can't renew, it will try to re-login.
 - It will re-queue `SecretsDefinition` events and in every event loop it will verify if the current Kubernetes secret it is in the desired state by comparing it with the data in Vault and creating/updating them accordingly
@@ -81,6 +81,7 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
 | `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
 | `vault.engine` | kv2 | Vault secrets engine to use. Only key/value engines supported. Default is kv version 2 |
+| `vault.approle-path` | approle | Vault approle path |
 | `vault.max-token-ttl` | 300 |Max seconds to consider a token expired. |
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
@@ -131,7 +132,7 @@ Vault tokens will be renewed by `secrets-manager` if the `ttl` is lower than `va
 
 
 ### Vault AppRole
-Vault token as a login mechanism has been deprecated in favor of the [AppRole](https://www.vaultproject.io/docs/auth/approle.html) authentication method for `secrets-manager`. 
+Vault token as a login mechanism has been deprecated in favor of the [AppRole](https://www.vaultproject.io/docs/auth/approle.html) authentication method for `secrets-manager`.
 `secrets-manager` will still renew the token obtained after login in, but will make `secrets-manager` more resilient in case of a token has expired due to network issues, Vault sealed, etc.
 
 So instead of expecting a token, `secrets-manager` expects a `role_id` and a `secret_id` to connect to Vault.

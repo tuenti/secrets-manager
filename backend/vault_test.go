@@ -28,6 +28,7 @@ const (
 	fakeToken             = "fake-token"
 	vaultFakeRoleID       = "12345678-9aaa-bbbb-cccc-dddddddddddd"
 	vaultFakeSecretID     = "eeeeeeee-ffff-0000-1111-123456789aaa"
+	vaultAppRolePath      = "approle"
 	defaultTokenTTL       = 40
 	defaultTokenRenewable = true
 	defaultRevokedToken   = false
@@ -502,6 +503,7 @@ func TestMain(m *testing.M) {
 		VaultSecretID:           vaultFakeSecretID,
 		VaultTokenPollingPeriod: 1,
 		VaultEngine:             "kv2",
+		VaultApprolePath:        vaultAppRolePath,
 	}
 
 	testCfg = &testConfig{

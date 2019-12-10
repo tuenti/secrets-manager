@@ -60,6 +60,7 @@ func main() {
 	flag.DurationVar(&backendCfg.VaultTokenPollingPeriod, "vault.token-polling-period", 15*time.Second, "Polling interval to check token expiration time.")
 	flag.IntVar(&backendCfg.VaultRenewTTLIncrement, "vault.renew-ttl-increment", 600, "TTL time for renewed token.")
 	flag.StringVar(&backendCfg.VaultEngine, "vault.engine", "kv2", "Vault secret engine. Only KV version 1 and 2 supported")
+	flag.StringVar(&backendCfg.VaultApprolePath, "vault.approle-path", "approle", "Vault approle path")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "", "Comma separated list of namespaces that secrets-manager will watch for SecretDefinitions. By default all namespaces are watched.")
 	flag.StringVar(&excludeNamespaces, "exclude-namespaces", "", "Comma separated list of namespaces that secrets-manager will not watch for SecretDefinitions. By default all namespaces are watched.")
 	flag.Parse()

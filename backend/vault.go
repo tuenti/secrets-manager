@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,6 +26,7 @@ type client struct {
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
+	approlePath        string
 	logger             logr.Logger
 }
 
@@ -33,7 +35,7 @@ func (c *client) vaultLogin() error {
 		"role_id":   c.roleID,
 		"secret_id": c.secretID,
 	}
-	resp, err := c.logical.Write("auth/approle/login", appRole)
+	resp, err := c.logical.Write(fmt.Sprintf("auth/%s/login", c.approlePath), appRole)
 	if err != nil {
 		return err
 	}
@@ -73,6 +75,7 @@ func vaultClient(l logr.Logger, cfg Config) (*client, error) {
 		tokenPollingPeriod: cfg.VaultTokenPollingPeriod,
 		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
 		engine:             engine,
+		approlePath:        cfg.VaultApprolePath,
 	}
 
 	err = client.vaultLogin()
