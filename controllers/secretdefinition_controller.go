@@ -46,7 +46,6 @@ type SecretDefinitionReconciler struct {
 	Ctx                  context.Context
 	APIReader            client.Reader
 	ReconciliationPeriod time.Duration
-	WatchNamespaces      map[string]bool
 }
 
 // Helper functions to check and remove string from a slice of strings.
@@ -247,8 +246,9 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 }
 
 // SetupWithManager will register the controller
-func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager, name string) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&smv1alpha1.SecretDefinition{}).
+		Named(name).
 		Complete(r)
 }

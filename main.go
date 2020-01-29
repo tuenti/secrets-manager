@@ -47,6 +47,7 @@ var version string
 
 func main() {
 	var metricsAddr string
+	var controllerName string
 	var enableLeaderElection bool
 	var enableDebugLog bool
 	var versionFlag bool
@@ -60,6 +61,7 @@ func main() {
 	backendCfg := backend.Config{}
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&controllerName, "controller-name", "SecretDefinition", "If running secrets manager in multiple namespaces, set the controller name to something unique avoid 'duplicate metrics collector registration attempted' errors.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&selectedBackend, "backend", "vault", "Selected backend. Only vault supported")
@@ -185,7 +187,7 @@ func main() {
 		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
 		Ctx:                  ctx,
 		ReconciliationPeriod: reconcilePeriod,
-	}).SetupWithManager(mgr)
+	}).SetupWithManager(mgr, controllerName)
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SecretDefinition")
 		os.Exit(1)

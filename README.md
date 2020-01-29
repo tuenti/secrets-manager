@@ -86,8 +86,22 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
 | `metrics-addr` | `:8080` | The address to listen on for HTTP requests. |
+| `controller-name` | SecretDefinition | If running secrets manager in multiple namespaces, set the controller name to something unique avoid 'duplicate metrics collector registration attempted' errors. |
 | `watch-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will watch for `SecretDefinitions`. By default all namespaces are watched. |
 | `exclude-namespaces` | `""` | Comma separated list of namespaces that secrets-manager will not watch for `SecretDefinitions`. By default all namespaces are watched. Note that if you exclude and watch the same namespace, excluding it will be prioritized. |
+
+## RBAC
+
+Secrets Manager can be run in one of 2 ways:
+
+* Global secrets management in all namespaces for the whole of a Kuberentes cluster
+* Manage specific namespaces
+
+In order for Secrets Manager to act as a manager for all Namespaces it requires a ClusterRole that enables it to manage all secrets and secretdefinitions in the entire Kubernetes cluster as in the [config/rbac/role.yaml](config/rbac/role.yaml) and [config/rbac/rolebinding.yaml](config/rbac/rolebinding.yaml) examples.
+
+Alternatively if you use the `watch-namespaces` argument to limit secretdefinition monitoring to sepcific namespaces then you can just give the `serviceAccount` that `secrets-manager` is running as a standard role and a rolebinding in each of the namespaces that you want it to manage as shown in the [config/rbac/secrets_manager_role.yaml](config/rbac/secrets_manager_role.yaml) and [config/rbac/secrets_manager_role_binding.yaml](config/rbac/secrets_manager_role_binding.yaml) examples. You can still use a cluster role if you so wish.
+
+If you use the `exclude-namepsaces` option then `secrets-manager` (in addition to either it's clusterrole or role) requires `list` on namespaces at the cluster scope will require a binding to a clusterrole with these privileges as in the [config/rbac/namespace_list_clusterrole.yaml](config/rbac/namespace_list_clusterrole.yaml) and [config/rbac/namespace_list_clusterrole_binding.yaml](config/rbac/namespace_list_clusterrole_binding.yaml) examples.
 
 ## Prometheus Metrics
 
