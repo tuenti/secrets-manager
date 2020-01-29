@@ -126,9 +126,10 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(mgr).ToNot(BeNil())
 
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).ToNot(HaveOccurred())
+
 	for _, ns := range namespaces {
-		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
-		Expect(err).ToNot(HaveOccurred())
 		nsSpec := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}
 		nsSpec.Name = ns
 		k8sClient.Create(context.Background(), nsSpec)
