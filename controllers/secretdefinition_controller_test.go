@@ -132,6 +132,9 @@ var _ = Describe("SecretsManager", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secretdef-labels",
+				Annotations: map[string]string{
+					"tekton.dev/git-0": "github.com",
+				},
 				Labels: map[string]string{
 					"test.example.com/name": "test",
 					"name":                  "secret-labels",
@@ -285,6 +288,7 @@ var _ = Describe("SecretsManager", func() {
 			annotations := secret.GetObjectMeta().GetAnnotations()
 			_, ok := annotations["secrets-manager.tuenti.io/lastUpdateTime"]
 			Expect(ok).To(BeTrue())
+			Expect(annotations["tekton.dev/git-0"]).To(Equal("github.com"))
 		})
 		It("Create a secretdefinition in a non-watched namespace", func() {
 			r2 := getReconciler()

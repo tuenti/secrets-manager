@@ -128,25 +128,30 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 
 // upsertSecret will create or update a secret
 func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
-	labels := map[string]string{}
+	// Merge labels and annotations from the SecretDefinition
+	labels := map[string]string{
+		managedByLabel: "secrets-manager",
+	}
 
-	// Merge labels from the SecretDefinition
 	for k, v := range sDef.Labels {
 		labels[k] = v
 	}
 
-	// add standard k8s label
-	labels[managedByLabel] = "secrets-manager"
+	annotations := map[string]string{
+		lastUpdateLabel: time.Now().Format(timestampFormat),
+	}
+
+	for k, v := range sDef.Annotations {
+		annotations[k] = v
+	}
 
 	secret := &corev1.Secret{
 		Type: corev1.SecretType(sDef.Spec.Type),
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				lastUpdateLabel: time.Now().Format(timestampFormat),
-			},
-			Labels:    labels,
-			Namespace: sDef.Namespace,
-			Name:      sDef.Spec.Name,
+			Annotations: annotations,
+			Labels:      labels,
+			Namespace:   sDef.Namespace,
+			Name:        sDef.Spec.Name,
 		},
 		Data: data,
 	}
