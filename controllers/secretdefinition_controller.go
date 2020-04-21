@@ -35,7 +35,9 @@ import (
 const (
 	// https://golang.org/pkg/time/#pkg-constants
 	timestampFormat = "2006-01-02T15.04.05Z"
-	finalizerName   = "secret.finalizer.secrets-manager.tuenti.io"
+	finalizerName   = "secret.finalizer." + smv1alpha1.Group
+	managedByLabel  = "app.kubernetes.io/managed-by"
+	lastUpdateLabel = smv1alpha1.Group + "/lastUpdateTime"
 )
 
 // SecretDefinitionReconciler reconciles a SecretDefinition object
@@ -126,15 +128,25 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 
 // upsertSecret will create or update a secret
 func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
+	labels := map[string]string{}
+
+	// Merge labels from the SecretDefinition
+	for k, v := range sDef.Labels {
+		labels[k] = v
+	}
+
+	// add standard k8s label
+	labels[managedByLabel] = "secrets-manager"
+
 	secret := &corev1.Secret{
 		Type: corev1.SecretType(sDef.Spec.Type),
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: sDef.Namespace,
-			Labels: map[string]string{
-				"managedBy":     "secrets-manager",
-				"lastUpdatedAt": time.Now().Format(timestampFormat),
+			Annotations: map[string]string{
+				lastUpdateLabel: time.Now().Format(timestampFormat),
 			},
-			Name: sDef.Spec.Name,
+			Labels:    labels,
+			Namespace: sDef.Namespace,
+			Name:      sDef.Spec.Name,
 		},
 		Data: data,
 	}

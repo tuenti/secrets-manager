@@ -11,8 +11,10 @@ import (
 
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -126,6 +128,27 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
+		sdWithLabels = &smv1alpha1.SecretDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "secretdef-labels",
+				Labels: map[string]string{
+					"test.example.com/name": "test",
+					"name":                  "secret-labels",
+				},
+			},
+			Spec: smv1alpha1.SecretDefinitionSpec{
+				Name: "secret-labels",
+				Type: "Opaque",
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"fooLabel": smv1alpha1.DataSource{
+						Path:     "secret/data/pathtosecret1",
+						Key:      "value",
+						Encoding: "base64",
+					},
+				},
+			},
+		}
 		sdExcludedNs = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
@@ -229,6 +252,40 @@ var _ = Describe("SecretsManager", func() {
 			})
 			Expect(reflect.TypeOf(err2)).To(Equal(reflect.TypeOf(expectedErr)))
 			Expect(res).To(Equal(reconcile.Result{}))
+		})
+		It("Create a secretdefinition and read the labels and annotations", func() {
+			//decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
+			err := r.Create(context.Background(), sdWithLabels)
+			Expect(err).To(BeNil())
+			res, err2 := r.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: sdWithLabels.Namespace,
+					Name:      sdWithLabels.Name,
+				},
+			})
+			Expect(res).ToNot(BeNil())
+			Expect(err2).To(BeNil())
+
+			_, err3 := r.getCurrentState("default", "secret-labels")
+			Expect(err3).To(BeNil())
+
+			reader := r.APIReader
+			secret := &corev1.Secret{}
+			err4 := reader.Get(r.Ctx, client.ObjectKey{
+				Namespace: sdWithLabels.Namespace,
+				Name:      "secret-labels",
+			}, secret)
+			Expect(err4).To(BeNil())
+
+			labels := secret.GetObjectMeta().GetLabels()
+			Expect(labels).To(Equal(map[string]string{
+				"app.kubernetes.io/managed-by": "secrets-manager",
+				"name":                         "secret-labels",
+				"test.example.com/name":        "test"}))
+
+			annotations := secret.GetObjectMeta().GetAnnotations()
+			_, ok := annotations["secrets-manager.tuenti.io/lastUpdateTime"]
+			Expect(ok).To(BeTrue())
 		})
 		It("Create a secretdefinition in a non-watched namespace", func() {
 			r2 := getReconciler()
