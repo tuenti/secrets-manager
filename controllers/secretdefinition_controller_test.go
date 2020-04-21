@@ -254,7 +254,6 @@ var _ = Describe("SecretsManager", func() {
 			Expect(res).To(Equal(reconcile.Result{}))
 		})
 		It("Create a secretdefinition and read the labels and annotations", func() {
-			//decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			err := r.Create(context.Background(), sdWithLabels)
 			Expect(err).To(BeNil())
 			res, err2 := r.Reconcile(reconcile.Request{
