@@ -51,6 +51,16 @@ type SecretDefinitionReconciler struct {
 	ExcludeNamespaces    map[string]bool
 }
 
+// Annotations to skip when copying from a SecretDef to a Secret
+var annotationsToSkip = map[string]bool{
+	corev1.LastAppliedConfigAnnotation: true,
+}
+
+// skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
+func skipCopyAnnotation(key string) bool {
+	return annotationsToSkip[key]
+}
+
 // Helper functions to check and remove string from a slice of strings.
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {
@@ -142,6 +152,9 @@ func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinit
 	}
 
 	for k, v := range sDef.Annotations {
+		if skipCopyAnnotation(k) {
+			continue
+		}
 		annotations[k] = v
 	}
 
