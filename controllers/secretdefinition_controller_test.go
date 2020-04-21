@@ -133,7 +133,8 @@ var _ = Describe("SecretsManager", func() {
 				Namespace: "default",
 				Name:      "secretdef-labels",
 				Annotations: map[string]string{
-					"tekton.dev/git-0": "github.com",
+					"tekton.dev/git-0":                         "github.com",
+					"kubernetes.io/last-applied-configuration": "test",
 				},
 				Labels: map[string]string{
 					"test.example.com/name": "test",
@@ -286,9 +287,14 @@ var _ = Describe("SecretsManager", func() {
 				"test.example.com/name":        "test"}))
 
 			annotations := secret.GetObjectMeta().GetAnnotations()
+			// lastUpdateTime annotation is created
 			_, ok := annotations["secrets-manager.tuenti.io/lastUpdateTime"]
 			Expect(ok).To(BeTrue())
+			// annotations from the SecretDef are passed to the secret
 			Expect(annotations["tekton.dev/git-0"]).To(Equal("github.com"))
+			// annotations to be skipped are not copied
+			_, ok2 := annotations["kubernetes.io/last-applied-configuration"]
+			Expect(ok2).ToNot(BeNil())
 		})
 		It("Create a secretdefinition in a non-watched namespace", func() {
 			r2 := getReconciler()
