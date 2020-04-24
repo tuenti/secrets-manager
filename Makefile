@@ -13,7 +13,7 @@ all: manager
 
 # Run tests
 test: generate fmt vet manifests
-	go test -v ./backend... ./errors/... ./controllers/... -coverprofile cover.out
+	go test -v ./backend/... ./errors/... ./controllers/... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet

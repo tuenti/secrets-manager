@@ -23,10 +23,28 @@ RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.0-beta.2
 RUN /go/bin/controller-gen object:headerFile=./hack/boilerplate.go.txt paths=./api/...
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags "-X main.version=${SECRETS_MANAGER_VERSION}" -a -o secrets-manager main.go
 
+
+#
+# Prod image
+#
+
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:latest
+FROM gcr.io/distroless/static:latest as prod
 WORKDIR /
 COPY --from=builder /workspace/secrets-manager .
 ENTRYPOINT ["/secrets-manager"]
 USER nobody
+
+
+#
+# Dev image
+#
+
+FROM builder as dev
+
+# kubebuilder needed to run tests in development environment
+RUN curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-alpha.4/kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+RUN tar -zxvf kubebuilder_2.0.0-alpha.4_linux_amd64.tar.gz
+RUN mv kubebuilder_2.0.0-alpha.4_linux_amd64 kubebuilder && mv kubebuilder /usr/local/
+RUN export PATH=$PATH:/usr/local/kubebuilder/bin
