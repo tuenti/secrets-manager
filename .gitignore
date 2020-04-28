@@ -25,3 +25,5 @@ bin
 *.swp
 *.swo
 *~
+
+secrets-manager
