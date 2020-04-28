@@ -4,7 +4,7 @@ services:
     build:
       context: .
       target: dev
-      dockerfile: Dockerfile
+      dockerfile: ./deploy/Dockerfile
     volumes:
       - "./:/workspace"
 
@@ -12,7 +12,7 @@ services:
     build:
       context: .
       target: dev
-      dockerfile: Dockerfile
+      dockerfile: ./deploy/Dockerfile
     volumes:
       - "./:/workspace"
     command: go test -v ./backend... ./errors/... ./controllers/... -coverprofile cover.out
@@ -20,5 +20,5 @@ services:
   secrets-manager:
     build:
       context: .
-      target: prod
-      dockerfile: Dockerfile
+      target: release
+      dockerfile: ./deploy/Dockerfile

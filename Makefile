@@ -1,13 +1,14 @@
-DOCKER_REGISTRY ?= "registry.hub.docker.com"
+DOCKER_REGISTRY = "registry.hub.docker.com"
+ORGANIZATION = "tuentitech"
 BINARY_NAME=secrets-manager
-SECRETS_MANAGER_VERSION=v1.0.2
+VERSION=$(shell deploy/version/get.sh)
 GO111MODULE=on
 # Image URL to use all building/pushing image targets
-IMG = ${DOCKER_REGISTRY}/${BINARY_NAME}:${SECRETS_MANAGER_VERSION}
+IMAGE = ${DOCKER_REGISTRY}/${ORGANIZATION}/${BINARY_NAME}:${VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
-BUILD_FLAGS=-ldflags "-X main.version=${SECRETS_MANAGER_VERSION}"
+BUILD_FLAGS=-ldflags "-X main.version=${VERSION}"
 
 all: manager
 
@@ -48,16 +49,6 @@ vet:
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./api/...
 
-# Build the docker image
-docker-build: test
-	docker build --build-arg SECRETS_MANAGER_VERSION=${SECRETS_MANAGER_VERSION} -t ${IMG} .
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
-
-# Push the docker image
-docker-push:
-	docker push ${IMG}
-
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
@@ -67,3 +58,30 @@ CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+# Run tests in docker
+docker-test:
+	docker-compose run tests
+
+# Build release docker image
+docker-build: docker-test
+	docker build . \
+		--file ./deploy/Dockerfile \
+		--target release \
+		--build-arg SECRETS_MANAGER_VERSION=${VERSION} \
+		--tag ${IMAGE}
+	@echo "updating kustomize image patch file for manager resource"
+	sed -i'' -e 's@image: .*@image: '"${IMAGE}"'@' ./config/default/manager_image_patch.yaml
+
+# Push the docker image
+docker-push:
+	docker push ${IMAGE}
+
+update-major-version:
+	deploy/version/update.sh --minor
+
+update-minor-version:
+	deploy/version/update.sh --minor
+
+update-patch-version:
+	deploy/version/update.sh --patch

@@ -30,7 +30,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags "-X m
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:latest as prod
+FROM gcr.io/distroless/static:latest as release
 WORKDIR /
 COPY --from=builder /workspace/secrets-manager .
 ENTRYPOINT ["/secrets-manager"]

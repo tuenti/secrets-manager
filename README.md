@@ -149,6 +149,16 @@ To get the `role_id`:
 
 `$ vault read auth/approle/role/secrets-manager/role-id`
 
+## Versioning
+
+Right now versioning it's a manually task.
+Depending on the kind of the update we would apply a major, minor or patch update given that we follow [semantic versionin](https://semver.org/).
+
+Before building release images, we should run one of the following commands:
+- make update-major-version 
+- make update-minor-version
+- make update-patch-version
+
 ## Deployment
 *secrets-manager* has been designed to be deployed in Kubernetes, you will find a full deployment example in the [config/samples](config/samples) folder.
 
