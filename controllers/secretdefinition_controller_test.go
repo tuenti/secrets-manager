@@ -165,6 +165,23 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
+		sdExcludedNs = &smv1alpha1.SecretDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "secretdef-excluded-ns",
+			},
+			Spec: smv1alpha1.SecretDefinitionSpec{
+				Name: "secret-excluded-ns",
+				Type: "Opaque",
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"fooExcludedNs": smv1alpha1.DataSource{
+						Path:     "secret/data/pathtosecret1",
+						Key:      "value",
+						Encoding: "base64",
+					},
+				},
+			},
+		}
 	)
 
 	BeforeEach(func() {
@@ -250,6 +267,20 @@ var _ = Describe("SecretsManager", func() {
 				},
 			})
 			Expect(reflect.TypeOf(err2)).To(Equal(reflect.TypeOf(expectedErr)))
+			Expect(res).To(Equal(reconcile.Result{}))
+		})
+		It("Create a secretdefinition in a excluded namespace", func() {
+			r2 := getReconciler()
+			r2.ExcludeNamespaces = map[string]bool{sdExcludedNs.Namespace: true}
+			err := r.Create(context.Background(), sdExcludedNs)
+			res, err2 := r.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: sdExcludedNs.Namespace,
+					Name:      sdExcludedNs.Name,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(err2).To(BeNil())
 			Expect(res).To(Equal(reconcile.Result{}))
 		})
 	})

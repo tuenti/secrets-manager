@@ -12,9 +12,7 @@ import (
 	"github.com/tuenti/secrets-manager/backend"
 	"github.com/tuenti/secrets-manager/controllers"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -31,15 +29,6 @@ func init() {
 	corev1.AddToScheme(scheme)
 	secretsmanagerv1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
-}
-
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }
 
 // To be filled from build ldflags
@@ -116,47 +105,17 @@ func main() {
 		return strings.Split(trimmed, ",")
 	}
 
-	// If watchNamespaces is set ignore excludeNamespaces
-	if len(excludeNamespaces) > 0 && len(watchNamespaces) <= 0 {
-		logger.Info("setting restricted namespace list for controller")
-		clientset, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
-		if err != nil {
-			logger.Error(err, "unable to get api client")
-		}
-		api := clientset.CoreV1()
-		namespaces, err := api.Namespaces().List(metav1.ListOptions{})
-		if err != nil {
-			logger.Error(err, "unable to get namespaces")
-		}
-		for _, namespace := range namespaces.Items {
-			if !stringInSlice(namespace.Name, nsSlice(excludeNamespaces)) {
-				namespaceList = append(namespaceList, namespace.Name)
-			}
-		}
-		nsList := strings.Join(namespaceList, ",")
-		logger.Info("watching namespaces: " + nsList)
-	} else {
-		if len(watchNamespaces) > 0 {
-			logger.Info("setting restricted namespace list for controller")
-			namespaceList = nsSlice(watchNamespaces)
-			// Remove any namespaces in excludeNamepsaces
-			if len(excludeNamespaces) > 0 {
-				for _, namespacea := range nsSlice(excludeNamespaces) {
-					for i, namespaceb := range namespaceList {
-						if namespacea == namespaceb {
-							namespaceList[i] = namespaceList[len(namespaceList)-1]
-							namespaceList[len(namespaceList)-1] = ""
-							namespaceList = namespaceList[:len(namespaceList)-1]
-						}
-					}
-				}
-			}
-			nsList := strings.Join(namespaceList, ",")
-			logger.Info("watching namespaces: " + nsList)
+	excludeNs := make(map[string]bool)
+	if len(excludeNamespaces) > 0 {
+		for _, ns := range nsSlice(excludeNamespaces) {
+			excludeNs[ns] = true
 		}
 	}
 
-	if len(namespaceList) > 0 {
+	if len(strings.TrimSpace(watchNamespaces)) > 0 {
+		logger.Info("setting restricted namespace list for controller")
+		namespaceList = nsSlice(watchNamespaces)
+		logger.Info("watching namespaces: " + watchNamespaces)
 		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:             scheme,
 			MetricsBindAddress: metricsAddr,
@@ -168,7 +127,6 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		logger.Info("watching all namespaces")
 		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:             scheme,
 			MetricsBindAddress: metricsAddr,
@@ -184,12 +142,13 @@ func main() {
 		Backend:              *backendClient,
 		Client:               mgr.GetClient(),
 		APIReader:            mgr.GetAPIReader(),
-		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
+		Log:                  ctrl.Log.WithName("controllers").WithName(controllerName),
 		Ctx:                  ctx,
 		ReconciliationPeriod: reconcilePeriod,
+		ExcludeNamespaces:    excludeNs,
 	}).SetupWithManager(mgr, controllerName)
 	if err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SecretDefinition")
+		setupLog.Error(err, "unable to create controller", "controller", controllerName)
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
