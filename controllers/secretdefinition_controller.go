@@ -52,9 +52,7 @@ type SecretDefinitionReconciler struct {
 }
 
 // Annotations to skip when copying from a SecretDef to a Secret
-var annotationsToSkip = map[string]bool{
-	corev1.LastAppliedConfigAnnotation: true,
-}
+var annotationsToSkip = make(map[string]bool)
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
 func skipCopyAnnotation(key string) bool {
@@ -293,4 +291,9 @@ func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager, name str
 		For(&smv1alpha1.SecretDefinition{}).
 		Named(name).
 		Complete(r)
+}
+
+func init() {
+	// last-applied-configuration should not be copied from the SecretDef to the Secret
+	annotationsToSkip[corev1.LastAppliedConfigAnnotation] = true
 }
