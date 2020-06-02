@@ -46,7 +46,7 @@ type SecretDefinitionReconciler struct {
 	Ctx                  context.Context
 	APIReader            client.Reader
 	ReconciliationPeriod time.Duration
-	WatchNamespaces      map[string]bool
+	ExcludeNamespaces    map[string]bool
 }
 
 // Helper functions to check and remove string from a slice of strings.
@@ -156,12 +156,12 @@ func (r *SecretDefinitionReconciler) deleteSecret(namespace string, name string)
 	return r.Delete(r.Ctx, secret)
 }
 
-// shouldWatch will return true if the secretDefinition is in a watchable namespace
-func (r *SecretDefinitionReconciler) shouldWatch(sDefNamespace string) bool {
-	if len(r.WatchNamespaces) > 0 {
-		return r.WatchNamespaces[sDefNamespace]
+// shouldExclude will return true if the secretDefinition is in an excluded namespace
+func (r *SecretDefinitionReconciler) shouldExclude(sDefNamespace string) bool {
+	if len(r.ExcludeNamespaces) > 0 {
+		return r.ExcludeNamespaces[sDefNamespace]
 	}
-	return true
+	return false
 }
 
 // AddFinalizerIfNotPresent will check if finalizerName is the finalizers slice
@@ -200,8 +200,8 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 			return ctrl.Result{}, err
 		}
 
-		if !r.shouldWatch(sDef.Namespace) {
-			log.Info("outside watched namespaces, ignoring", "watched_namespaces", r.WatchNamespaces)
+		if r.shouldExclude(sDef.Namespace) {
+			log.Info("Secret definition in excluded namespace, ignoring", "excluded_namespaces", r.ExcludeNamespaces)
 			return ctrl.Result{}, nil
 		}
 		// Get data from the secret source of truth
@@ -259,8 +259,9 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 }
 
 // SetupWithManager will register the controller
-func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *SecretDefinitionReconciler) SetupWithManager(mgr ctrl.Manager, name string) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&smv1alpha1.SecretDefinition{}).
+		Named(name).
 		Complete(r)
 }

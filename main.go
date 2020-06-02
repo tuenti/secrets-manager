@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
@@ -35,6 +36,7 @@ var version string
 
 func main() {
 	var metricsAddr string
+	var controllerName string
 	var enableLeaderElection bool
 	var enableDebugLog bool
 	var versionFlag bool
@@ -42,10 +44,13 @@ func main() {
 	var selectedBackend string
 	var watchNamespaces string
 	var excludeNamespaces string
+	var mgr ctrl.Manager
+	var namespaceList []string
 
 	backendCfg := backend.Config{}
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&controllerName, "controller-name", "SecretDefinition", "If running secrets manager in multiple namespaces, set the controller name to something unique avoid 'duplicate metrics collector registration attempted' errors.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&selectedBackend, "backend", "vault", "Selected backend. Only vault supported")
@@ -95,30 +100,41 @@ func main() {
 
 	ctrl.SetLogger(zap.Logger(enableDebugLog))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     enableLeaderElection,
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
 	nsSlice := func(ns string) []string {
 		trimmed := strings.Trim(strings.TrimSpace(ns), "\"")
 		return strings.Split(trimmed, ",")
 	}
 
-	watchNs := make(map[string]bool)
-	if len(watchNamespaces) > 0 {
-		for _, ns := range nsSlice(watchNamespaces) {
-			watchNs[ns] = true
-		}
-	}
+	excludeNs := make(map[string]bool)
 	if len(excludeNamespaces) > 0 {
 		for _, ns := range nsSlice(excludeNamespaces) {
-			watchNs[ns] = false
+			excludeNs[ns] = true
+		}
+	}
+
+	if len(strings.TrimSpace(watchNamespaces)) > 0 {
+		logger.Info("setting restricted namespace list for controller")
+		namespaceList = nsSlice(watchNamespaces)
+		logger.Info("watching namespaces: " + watchNamespaces)
+		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+			Scheme:             scheme,
+			MetricsBindAddress: metricsAddr,
+			LeaderElection:     enableLeaderElection,
+			NewCache:           cache.MultiNamespacedCacheBuilder(namespaceList),
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to start manager")
+			os.Exit(1)
+		}
+	} else {
+		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+			Scheme:             scheme,
+			MetricsBindAddress: metricsAddr,
+			LeaderElection:     enableLeaderElection,
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to start manager")
+			os.Exit(1)
 		}
 	}
 
@@ -126,13 +142,13 @@ func main() {
 		Backend:              *backendClient,
 		Client:               mgr.GetClient(),
 		APIReader:            mgr.GetAPIReader(),
-		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
+		Log:                  ctrl.Log.WithName("controllers").WithName(controllerName),
 		Ctx:                  ctx,
 		ReconciliationPeriod: reconcilePeriod,
-		WatchNamespaces:      watchNs,
-	}).SetupWithManager(mgr)
+		ExcludeNamespaces:    excludeNs,
+	}).SetupWithManager(mgr, controllerName)
 	if err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SecretDefinition")
+		setupLog.Error(err, "unable to create controller", "controller", controllerName)
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
