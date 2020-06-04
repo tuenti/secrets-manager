@@ -1,3 +1,11 @@
+## no code related changes 2020-04-28
+
+- No logic changes in secrets-manager. But we are going to stablish some changes in the project management:
+  - Now versions are going to follow [semantic versioning](https://semver.org/) where version tags are going to have the 'v' preffix, they are going to be just:
+    - v{major}.{minor}.{patch}, where major, minor and path are integers
+
+  - From now on we are going to push release candidates to the [docker registry](https://hub.docker.com/repository/docker/tuentitech/secrets-manager)
+
 ## v1.0.2 2019-11-17
 
 Stable release. Adds watching specific namespaces (see v1.0.2-rc.1) and some minor fixes.
