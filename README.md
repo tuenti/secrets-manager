@@ -99,7 +99,14 @@ Secrets Manager can be run in one of 2 ways:
 
 In order for Secrets Manager to act as a manager for all Namespaces it requires a ClusterRole that enables it to manage all secrets and secretdefinitions in the entire Kubernetes cluster as in the [config/rbac/role.yaml](config/rbac/role.yaml) and [config/rbac/rolebinding.yaml](config/rbac/rolebinding.yaml) examples.
 
-Alternatively if you use the `watch-namespaces` argument to limit secretdefinition monitoring to sepcific namespaces then you can just give the `serviceAccount` that `secrets-manager` is running as a standard role and a rolebinding in each of the namespaces that you want it to manage as shown in the [config/rbac/secrets_manager_role.yaml](config/rbac/secrets_manager_role.yaml) and [config/rbac/secrets_manager_role_binding.yaml](config/rbac/secrets_manager_role_binding.yaml) examples.Alternatively you can still use a cluster role if you so wish.
+Alternatively if you use the `watch-namespaces` argument to limit secretdefinition monitoring to sepcific namespaces then you can just give the `serviceAccount` that `secrets-manager` is running as a standard role and a rolebinding in each of the namespaces that you want it to manage as shown in the [config/rbac/secrets_manager_role.yaml](config/rbac/secrets_manager_role.yaml) and [config/rbac/secrets_manager_role_binding.yaml](config/rbac/secrets_manager_role_binding.yaml) examples. Alternatively you can still use a cluster role if you so wish.
+
+To be able to interact with `secretdefinition` resources using the standard `admin`, `edit` and `view` Kubernetes native roles, you need to create the following `ClusterRole` aggregations:
+
+- [config/rbac/secretdefinitions_admin_clusterrole_aggregation.yaml](config/rbac/secretdefinitions_admin_clusterrole_aggregation.yaml)
+- [config/rbac/secretdefinitions_view_clusterrole_aggregation.yaml](config/rbac/secretdefinitions_view_clusterrole_aggregation.yaml)
+
+More information about aggregated `ClusterRoles` can be found at [kubernetes.io > Using RBAC Authorization > Aggregated ClusterRoles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
 
 ## Prometheus Metrics
 
