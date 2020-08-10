@@ -234,9 +234,8 @@ func (r *SecretDefinitionReconciler) Reconcile(req ctrl.Request) (ctrl.Result, e
 				return ctrl.Result{}, err
 			}
 			log.Info("secret updated")
-			secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(1.0)
 		}
-
+		secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(1.0)
 		return ctrl.Result{RequeueAfter: r.ReconciliationPeriod}, nil
 
 	} else {
