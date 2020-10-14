@@ -97,7 +97,7 @@ Secrets Manager can be run in one of 2 ways:
 * Global secrets management in all namespaces for the whole of a Kuberentes cluster
 * Manage specific namespaces
 
-In order for Secrets Manager to act as a manager for all Namespaces it requires a ClusterRole that enables it to manage all secrets and secretdefinitions in the entire Kubernetes cluster as in the [config/rbac/role.yaml](config/rbac/role.yaml) and [config/rbac/rolebinding.yaml](config/rbac/rolebinding.yaml) examples.
+In order for Secrets Manager to act as a manager for all Namespaces it requires a ClusterRole that enables it to manage all secrets and secretdefinitions in the entire Kubernetes cluster as in the [config/rbac/role.yaml](config/rbac/role.yaml) and [config/rbac/role_binding.yaml](config/rbac/role_binding.yaml) examples.
 
 Alternatively if you use the `watch-namespaces` argument to limit secretdefinition monitoring to sepcific namespaces then you can just give the `serviceAccount` that `secrets-manager` is running as a standard role and a rolebinding in each of the namespaces that you want it to manage as shown in the [config/rbac/secrets_manager_role.yaml](config/rbac/secrets_manager_role.yaml) and [config/rbac/secrets_manager_role_binding.yaml](config/rbac/secrets_manager_role_binding.yaml) examples. Alternatively you can still use a cluster role if you so wish.
 
