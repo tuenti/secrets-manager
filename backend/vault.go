@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -15,27 +18,68 @@ import (
 
 var vMetrics *vaultMetrics
 
-const defaultSecretKey = "data"
+const (
+	defaultSecretKey       = "data"
+	kubernetesJwtTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	kubernetesAuthMethod   = "kubernetes"
+	appRoleAuthMethod      = "approle"
+)
 
 type client struct {
 	vclient            *api.Client
 	logical            *api.Logical
 	roleID             string
+	authMethod         string
 	secretID           string
+	kubernetesRole     string
 	maxTokenTTL        int64
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
 	approlePath        string
+	kubernetesPath     string
 	logger             logr.Logger
 }
 
 func (c *client) vaultLogin() error {
+	switch c.authMethod {
+	case appRoleAuthMethod:
+		return c.vaultAppRoleLogin()
+	case kubernetesAuthMethod:
+		fd, err := os.Open(kubernetesJwtTokenPath)
+		defer fd.Close()
+		if err != nil {
+			return err
+		}
+		return c.vaultKubernetesLogin(fd)
+	default:
+		return c.vaultAppRoleLogin()
+	}
+}
+
+func (c *client) vaultAppRoleLogin() error {
 	appRole := map[string]interface{}{
 		"role_id":   c.roleID,
 		"secret_id": c.secretID,
 	}
 	resp, err := c.logical.Write(fmt.Sprintf("auth/%s/login", c.approlePath), appRole)
+	if err != nil {
+		return err
+	}
+	c.vclient.SetToken(resp.Auth.ClientToken)
+	return nil
+}
+
+func (c *client) vaultKubernetesLogin(podSATokenReader io.Reader) error {
+	jwt, err := ioutil.ReadAll(podSATokenReader)
+	if err != nil {
+		return err
+	}
+	kubernetes := map[string]interface{}{
+		"jwt":  string(jwt),
+		"role": c.kubernetesRole,
+	}
+	resp, err := c.logical.Write(fmt.Sprintf("auth/%s/login", c.kubernetesPath), kubernetes)
 	if err != nil {
 		return err
 	}
@@ -69,13 +113,16 @@ func vaultClient(l logr.Logger, cfg Config) (*client, error) {
 	client := client{
 		vclient:            vclient,
 		logical:            logical,
+		authMethod:         cfg.VaultAuthMethod,
 		roleID:             cfg.VaultRoleID,
 		secretID:           cfg.VaultSecretID,
+		kubernetesRole:     cfg.VaultKubernetesRole,
 		maxTokenTTL:        cfg.VaultMaxTokenTTL,
 		tokenPollingPeriod: cfg.VaultTokenPollingPeriod,
 		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
 		engine:             engine,
 		approlePath:        cfg.VaultApprolePath,
+		kubernetesPath:     cfg.VaultKubernetesPath,
 	}
 
 	err = client.vaultLogin()

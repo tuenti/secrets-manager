@@ -81,7 +81,10 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
 | `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
 | `vault.engine` | kv2 | Vault secrets engine to use. Only key/value engines supported. Default is kv version 2 |
-| `vault.approle-path` | approle | Vault approle path |
+| `vault.auth-method` | approle | Vault authentication method. Supported: approle, kubernetes. |
+| `vault.approle-path` | approle | Vault approle login path |
+| `vault.kubernetes-path` | kubernetes | Vault kubernetes login path |
+| `vault.kubernetes-role` | `""` | Vault kubernetes role name |
 | `vault.max-token-ttl` | 300 |Max seconds to consider a token expired. |
 | `vault.token-polling-period` | 15s | Polling interval to check token expiration time. |
 | `vault.renew-ttl-increment` | 600 | TTL time for renewed token. |
@@ -168,13 +171,32 @@ To get the `role_id`:
 
 `$ vault read auth/approle/role/secrets-manager/role-id`
 
+### Vault Kubernetes Authentication
+In addition to `appRole`, `secrets-manager` can authenticate to Vault using its own Kubernetes `serviceAccount`. Follow the [Vault Kubernetes auth guide](https://www.vaultproject.io/docs/auth/kubernetes) to enable it and configure it.
+
+Example:
+
+```sh
+$ cat > secrets-manager-role.json <<EOF
+{
+  "bound_service_account_names": [ "secrets-manager" ],
+  "bound_service_account_namespaces": [ "my-namesapace" ],
+  "policies": [ "my-policy" ],
+  "max_ttl": 3600
+}
+EOF
+
+$ vault write auth/kubernetes/role/secrets-manager @secrets-manager-role.json
+```
+
+
 ## Versioning
 
 Right now versioning it's a manually task.
 Depending on the kind of the update we would apply a major, minor or patch update given that we follow [semantic versionin](https://semver.org/).
 
 Before building release images, we should run one of the following commands:
-- make update-major-version 
+- make update-major-version
 - make update-minor-version
 - make update-patch-version
 

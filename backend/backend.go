@@ -20,13 +20,16 @@ func init() {
 type Config struct {
 	BackendTimeout          time.Duration
 	VaultURL                string
+	VaultAuthMethod         string
 	VaultRoleID             string
 	VaultSecretID           string
+	VaultKubernetesRole     string
 	VaultMaxTokenTTL        int64
 	VaultTokenPollingPeriod time.Duration
 	VaultRenewTTLIncrement  int
 	VaultEngine             string
 	VaultApprolePath        string
+	VaultKubernetesPath     string
 }
 
 // Client interface represent a backend client interface that should be implemented
