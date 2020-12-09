@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/vault/api"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/tuenti/secrets-manager/errors"
@@ -33,14 +35,17 @@ const (
 	defaultTokenRenewable = true
 	defaultRevokedToken   = false
 	defaultInvalidAppRole = false
+	defaultKubernetesRole = false
+	fakeKubernetesSAToken = `eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.bQTnz6AuMJvmXXQsVPrxeQNvzDkimo7VNXxHeSBfClLufmCVZRUuyTwJF311JHuh`
 )
 
 type testConfig struct {
-	tokenTTL        int
-	tokenRenewable  bool
-	tokenRevoked    bool
-	invalidRoleID   bool
-	invalidSecretID bool
+	tokenTTL              int
+	tokenRenewable        bool
+	tokenRevoked          bool
+	invalidRoleID         bool
+	invalidSecretID       bool
+	invalidKubernetesRole bool
 }
 
 var (
@@ -162,6 +167,39 @@ func v1AuthTokenRenewSelf(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func v1AuthKubernetesLogin(w http.ResponseWriter, r *http.Request) {
+	var response interface{}
+	jsonData := ""
+	if !testCfg.invalidKubernetesRole {
+		jsonData = fmt.Sprintf(`
+		{
+  "auth": {
+    "client_token": "%s",
+    "accessor": "78e87a38-84ed-2692-538f-ca8b9f400ab3",
+    "policies": ["secrets-manager"],
+    "metadata": {
+      "role": "secrets-manager",
+      "service_account_name": "secrets-manager",
+      "service_account_namespace": "default",
+      "service_account_secret_name": "secrets-manager-token-pd21c",
+      "service_account_uid": "aa9aa8ff-98d0-11e7-9bb7-0800276d99bf"
+    },
+    "lease_duration": 2764800,
+    "renewable": true
+  }
+}`, fakeToken)
+	} else {
+		jsonData = `{"errors":["forbidden"]}`
+		w.WriteHeader(http.StatusForbidden)
+	}
+	if err := json.Unmarshal([]byte(jsonData), &response); err != nil {
+		fmt.Printf("unable to unmarshal json %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 func v1AuthAppRoleLogin(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := ""
@@ -266,6 +304,24 @@ func v1SecretTestKv1(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func TestVaultLoginKubernetes(t *testing.T) {
+	httpClient := new(http.Client)
+	vclient, _ := api.NewClient(&api.Config{Address: vaultCfg.VaultURL, HttpClient: httpClient})
+	c := &client{
+		vclient:        vclient,
+		logical:        vclient.Logical(),
+		authMethod:     "kubernetes",
+		kubernetesRole: "secrets-manager",
+		kubernetesPath: "kubernetes",
+	}
+	err := c.vaultKubernetesLogin(strings.NewReader(fakeKubernetesSAToken))
+	assert.Nil(t, err)
+	mutex.Lock()
+	defer mutex.Unlock()
+	testCfg.invalidKubernetesRole = true
+	err2 := c.vaultKubernetesLogin(strings.NewReader(fakeKubernetesSAToken))
+	assert.NotNil(t, err2)
+}
 func TestVaultBackendInvalidCfg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -491,6 +547,7 @@ func TestMain(m *testing.M) {
 	v1AuthHandler.HandleFunc("/token/lookup-self", v1AuthTokenLookupSelf).Methods("GET")
 	v1AuthHandler.HandleFunc("/token/renew-self", v1AuthTokenRenewSelf).Methods("PUT")
 	v1AuthHandler.HandleFunc("/approle/login", v1AuthAppRoleLogin).Methods("PUT")
+	v1AuthHandler.HandleFunc("/kubernetes/login", v1AuthKubernetesLogin).Methods("PUT")
 	v1SecretHandler.HandleFunc("/data/test", v1SecretTestKv2).Methods("GET")
 	v1SecretHandler.HandleFunc("/test", v1SecretTestKv1).Methods("GET")
 
