@@ -43,8 +43,6 @@ type client struct {
 
 func (c *client) vaultLogin() error {
 	switch c.authMethod {
-	case appRoleAuthMethod:
-		return c.vaultAppRoleLogin()
 	case kubernetesAuthMethod:
 		fd, err := os.Open(kubernetesJwtTokenPath)
 		defer fd.Close()
@@ -52,6 +50,8 @@ func (c *client) vaultLogin() error {
 			return err
 		}
 		return c.vaultKubernetesLogin(fd)
+	case appRoleAuthMethod:
+		fallthrough
 	default:
 		return c.vaultAppRoleLogin()
 	}
