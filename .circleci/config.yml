@@ -1,6 +1,6 @@
 ---
   version: 2.0
-  
+
   jobs:
     unit_tests:
       docker:
@@ -46,7 +46,7 @@
       - run: mv kubebuilder_2.0.0-alpha.4_linux_amd64 kubebuilder && sudo mv kubebuilder /usr/local/
       - run: export PATH=$PATH:/usr/local/kubebuilder/bin
       - run: make test
-  
+
   workflows:
     version: 2
     secrets-manager:
@@ -66,4 +66,3 @@
               only: /^v[0-9]+(\.[0-9]+){2}(-.+|[^-.]*)$/
             branches:
               ignore: /.*/
-  

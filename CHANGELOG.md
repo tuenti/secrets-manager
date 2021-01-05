@@ -1,3 +1,11 @@
+## v1.1.0 2021-01-05
+
+- [BEHAVIOUR] Using flags watch-namespaces / exclude-namespaces. They interact differently.
+  - All namespaces are watched. A namespace is excluded if it is specified within the *exclude-namespaces* flag.
+- [FEATURE] Adding **auth-method** param to specify Vault authentication method.
+  - Adding vault authentication method from kubernetes. With **auth-method** param set to **kubernetes**.
+- [BUG] set the controller name to something unique avoid 'duplicate metrics collector registration attempted' errors.
+
 ## no code related changes 2020-04-28
 
 - No logic changes in secrets-manager. But we are going to stablish some changes in the project management:
