@@ -69,6 +69,31 @@ func removeString(slice []string, s string) (result []string) {
 	return
 }
 
+// Helper functions to manage corev1.Secret and smv1alpha1.SecretDefinition
+func getObjectMetaFromSecretDefinition(sDef *smv1alpha1.SecretDefinition) (metav1.ObjectMeta) {
+	return metav1.ObjectMeta{
+		Namespace: sDef.Namespace,
+		Labels: sDef.ObjectMeta.Labels,
+		Name: sDef.Spec.Name,
+		Annotations: sDef.ObjectMeta.Annotations,
+	}
+}
+
+func getSecretFromSecretDefinition(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) (*corev1.Secret) {
+	objectMeta := getObjectMetaFromSecretDefinition(sDef)
+	if objectMeta.Labels == nil {
+		objectMeta.Labels = make(map[string]string)
+	}
+	objectMeta.Labels["managedBy"] = "secrets-manager"
+	objectMeta.Labels["lastUpdatedAt"] = time.Now().Format(timestampFormat)
+
+	return &corev1.Secret{
+		Type: corev1.SecretType(sDef.Spec.Type),
+		ObjectMeta: objectMeta,
+		Data: data,
+	}
+}
+
 // Ignore not found errors
 func ignoreNotFoundError(err error) error {
 	if errors.IsNotFound(err) {
@@ -122,30 +147,6 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 	}
 	data = secret.Data
 	return data, err
-}
-
-func getObjectMetaFromSecretDefinition(sDef *smv1alpha1.SecretDefinition) (metav1.ObjectMeta) {
-	return metav1.ObjectMeta{
-		Namespace: sDef.Namespace,
-		Labels: sDef.ObjectMeta.Labels,
-		Name: sDef.Spec.Name,
-		Annotations: sDef.ObjectMeta.Annotations,
-	}
-}
-
-func getSecretFromSecretDefinition(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) (*corev1.Secret) {
-	objectMeta := getObjectMetaFromSecretDefinition(sDef)
-	if objectMeta.Labels == nil {
-		objectMeta.Labels = make(map[string]string)
-	}
-	objectMeta.Labels["managedBy"] = "secrets-manager"
-	objectMeta.Labels["lastUpdatedAt"] = time.Now().Format(timestampFormat)
-
-	return &corev1.Secret{
-		Type: corev1.SecretType(sDef.Spec.Type),
-		ObjectMeta: objectMeta,
-		Data: data,
-	}
 }
 
 // upsertSecret will create or update a secret
