@@ -124,20 +124,33 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 	return data, err
 }
 
-// upsertSecret will create or update a secret
-func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
-	secret := &corev1.Secret{
+func getObjectMetaFromSecretDefinition(sDef *smv1alpha1.SecretDefinition) (metav1.ObjectMeta) {
+	return metav1.ObjectMeta{
+		Namespace: sDef.Namespace,
+		Labels: sDef.ObjectMeta.Labels,
+		Name: sDef.Spec.Name,
+		Annotations: sDef.ObjectMeta.Annotations,
+	}
+}
+
+func getSecretFromSecretDefinition(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) (*corev1.Secret) {
+	objectMeta := getObjectMetaFromSecretDefinition(sDef)
+	if objectMeta.Labels == nil {
+		objectMeta.Labels = make(map[string]string)
+	}
+	objectMeta.Labels["managedBy"] = "secrets-manager"
+	objectMeta.Labels["lastUpdatedAt"] = time.Now().Format(timestampFormat)
+
+	return &corev1.Secret{
 		Type: corev1.SecretType(sDef.Spec.Type),
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: sDef.Namespace,
-			Labels: map[string]string{
-				"managedBy":     "secrets-manager",
-				"lastUpdatedAt": time.Now().Format(timestampFormat),
-			},
-			Name: sDef.Spec.Name,
-		},
+		ObjectMeta: objectMeta,
 		Data: data,
 	}
+}
+
+// upsertSecret will create or update a secret
+func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
+	secret := getSecretFromSecretDefinition(sDef, data)
 	err := r.Create(r.Ctx, secret)
 	if errors.IsAlreadyExists(err) {
 		err = r.Update(r.Ctx, secret)

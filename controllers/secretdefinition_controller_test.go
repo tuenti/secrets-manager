@@ -29,13 +29,25 @@ var _ = Describe("SecretsManager", func() {
 	var (
 		cfg *rest.Config
 		r   *SecretDefinitionReconciler
+
+		decodedBytes, _ = base64.StdEncoding.DecodeString(encodedValue)
+		anyData = map[string][]byte{"foo": decodedBytes}
+
 		sd  = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-test",
+				Name:      "secret-name",
+				Labels: map[string]string{
+					"sdLabel1": "schrodinger_label",
+					"sdLabel2": "my_value",
+				},
+				Annotations: map[string]string{
+					"ann1": "another_value",
+					"ann2": "just_a_value",
+				},
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-test",
+				Name: "secret-name",
 				Type: "Opaque",
 				KeysMap: map[string]smv1alpha1.DataSource{
 					"foo": smv1alpha1.DataSource{
@@ -52,7 +64,7 @@ var _ = Describe("SecretsManager", func() {
 				Name:      "secretdef-test2",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-test2",
+				Name: "secret-name2",
 				Type: "Opaque",
 				KeysMap: map[string]smv1alpha1.DataSource{
 					"foo2": smv1alpha1.DataSource{
@@ -194,7 +206,6 @@ var _ = Describe("SecretsManager", func() {
 
 	Context("SecretDefinitionReconciler.Reconcile", func() {
 		It("Create a secretdefinition and read the secret", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			err := r.Create(context.Background(), sd)
 			Expect(err).To(BeNil())
 			res, err2 := r.Reconcile(reconcile.Request{
@@ -207,13 +218,12 @@ var _ = Describe("SecretsManager", func() {
 			Expect(res).ToNot(BeNil())
 			Expect(err2).To(BeNil())
 
-			data, err3 := r.getCurrentState("default", "secret-test")
+			data, err3 := r.getCurrentState("default", "secret-name")
 			Expect(err3).To(BeNil())
-			Expect(data).To(Equal(map[string][]byte{"foo": decodedBytes}))
+			Expect(data).To(Equal(anyData))
 		})
 
 		It("Delete a secretdefinition should delete a secret", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			err := r.Create(context.Background(), sd2)
 			Expect(err).To(BeNil())
 			res, err2 := r.Reconcile(reconcile.Request{
@@ -227,7 +237,7 @@ var _ = Describe("SecretsManager", func() {
 			Expect(err2).To(BeNil())
 			Expect(sd2.ObjectMeta.Finalizers).To(BeEmpty())
 
-			data, err3 := r.getCurrentState("default", "secret-test2")
+			data, err3 := r.getCurrentState("default", "secret-name2")
 			Expect(err3).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"foo2": decodedBytes}))
 
@@ -240,7 +250,7 @@ var _ = Describe("SecretsManager", func() {
 				},
 			})
 			Expect(err5).To(BeNil())
-			data2, err6 := r.getCurrentState("default", "secret-test2")
+			data2, err6 := r.getCurrentState("default", "secret-name2")
 			Expect(err6).ToNot(BeNil())
 			Expect(data2).To(BeEmpty())
 		})
@@ -286,11 +296,26 @@ var _ = Describe("SecretsManager", func() {
 	})
 	Context("SecretDefinitionReconciler.upsertSecret", func() {
 		It("Upsert a secret twice should not raise an error", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			err := r.upsertSecret(sd, map[string][]byte{"foo": decodedBytes})
+			err := r.upsertSecret(sd, anyData)
 			Expect(err).To(BeNil())
-			err2 := r.upsertSecret(sd, map[string][]byte{"foo": decodedBytes})
+			err2 := r.upsertSecret(sd, anyData)
 			Expect(err2).To(BeNil())
+		})
+	})
+	Context("SecretDefinitionReconciler.getObjectMetaFromSecretDefinition", func() {
+		It("getObjectMetaFromSecretDefinition should return an ObjectMeta", func() {
+			objectMeta := getObjectMetaFromSecretDefinition(sd)
+			Expect(objectMeta.Namespace).To(Equal(sd.ObjectMeta.Namespace))
+			Expect(objectMeta.Labels).To(BeEquivalentTo(sd.ObjectMeta.Labels))
+			Expect(objectMeta.Name).To(Equal(sd.ObjectMeta.Name))
+			Expect(objectMeta.Annotations).To(BeEquivalentTo(sd.ObjectMeta.Annotations))
+		})
+	})
+	Context("SecretDefinitionReconciler.getSecretFromSecretDefinition", func() {
+		It("getSecretFromSecretDefinition should add custom labels to the secret", func() {
+			secret := getSecretFromSecretDefinition(sd, anyData)
+			Expect(secret.ObjectMeta.Labels).Should(HaveKey("managedBy"))
+			Expect(secret.ObjectMeta.Labels).Should(HaveKey("lastUpdatedAt"))
 		})
 	})
 	Context("Manager.MultiNamespacedCache", func() {
@@ -298,7 +323,6 @@ var _ = Describe("SecretsManager", func() {
 		It("Creates secret in watched namespace", func(done Done) {
 			scheme := getScheme()
 
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 				Scheme:             scheme,
 				MetricsBindAddress: "0",
@@ -361,7 +385,6 @@ var _ = Describe("SecretsManager", func() {
 		It("Creates secrets in multiple watched namespaces", func(done Done) {
 			scheme := getScheme()
 
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
 			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 				Scheme:             scheme,
 				MetricsBindAddress: "0",
