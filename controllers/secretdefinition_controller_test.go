@@ -19,7 +19,6 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -32,10 +31,48 @@ var _ = Describe("SecretsManager", func() {
 	var (
 		cfg *rest.Config
 		r   *SecretDefinitionReconciler
+
+		decodedBytes, _ = base64.StdEncoding.DecodeString(encodedValue)
+		anyData = map[string][]byte{"foo": decodedBytes}
+
 		sd  = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-test",
+				Name:      "secret-test",
+				Labels: map[string]string{
+					"test.example.com/name": "test",
+					"name":                  "secret_labels",
+				},
+				Annotations: map[string]string{
+					"ann1": "another_value",
+					"ann2": "just_a_value",
+				},
+			},
+			Spec: smv1alpha1.SecretDefinitionSpec{
+				Name: "secret-test",
+				Type: "Opaque",
+				KeysMap: map[string]smv1alpha1.DataSource{
+					"foo": smv1alpha1.DataSource{
+						Path:     "secret/data/pathtosecret1",
+						Key:      "value",
+						Encoding: "base64",
+					},
+				},
+			},
+		}
+		sdWithSkipAnnotations  = &smv1alpha1.SecretDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "secret-test",
+				Labels: map[string]string{
+					"test.example.com/name": "test",
+					"name":                  "secret_labels",
+				},
+				Annotations: map[string]string{
+					"ann1": "another_value",
+					"ann2": "just_a_value",
+					corev1.LastAppliedConfigAnnotation: "to_be_skipped",
+				},
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-test",
@@ -52,7 +89,7 @@ var _ = Describe("SecretsManager", func() {
 		sd2 = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-test2",
+				Name:      "secret-test2",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-test2",
@@ -69,7 +106,7 @@ var _ = Describe("SecretsManager", func() {
 		sdNotWatched = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "notwatched",
-				Name:      "secretdef-notwatched",
+				Name:      "secret-notwatched",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-notwatched",
@@ -86,7 +123,7 @@ var _ = Describe("SecretsManager", func() {
 		sdWatched = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "watched",
-				Name:      "secretdef-watched",
+				Name:      "secret-watched",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-watched",
@@ -103,7 +140,7 @@ var _ = Describe("SecretsManager", func() {
 		sdMultiWatched1 = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "watched1",
-				Name:      "secretdef-multi1",
+				Name:      "secret-multi1",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-multi1",
@@ -120,7 +157,7 @@ var _ = Describe("SecretsManager", func() {
 		sdMultiWatched2 = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "watched2",
-				Name:      "secretdef-multi2",
+				Name:      "secret-multi2",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-multi2",
@@ -137,7 +174,7 @@ var _ = Describe("SecretsManager", func() {
 		sdBackendSecretNotFound = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-beckend-secret-not-found",
+				Name:      "secret-beckend-secret-not-found",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-backend-secret-not-found",
@@ -154,7 +191,7 @@ var _ = Describe("SecretsManager", func() {
 		sdWrongEncoding = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-wrong-encoding",
+				Name:      "secret-wrong-encoding",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-wrong-encoding",
@@ -168,35 +205,10 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sdWithLabels = &smv1alpha1.SecretDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      "secretdef-labels",
-				Annotations: map[string]string{
-					"tekton.dev/git-0":                         "github.com",
-					"kubernetes.io/last-applied-configuration": "test",
-				},
-				Labels: map[string]string{
-					"test.example.com/name": "test",
-					"name":                  "secret-labels",
-				},
-			},
-			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-labels",
-				Type: "Opaque",
-				KeysMap: map[string]smv1alpha1.DataSource{
-					"fooLabel": smv1alpha1.DataSource{
-						Path:     "secret/data/pathtosecret1",
-						Key:      "value",
-						Encoding: "base64",
-					},
-				},
-			},
-		}
 		sdExcludedNs = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
-				Name:      "secretdef-excluded-ns",
+				Name:      "secret-excluded-ns",
 			},
 			Spec: smv1alpha1.SecretDefinitionSpec{
 				Name: "secret-excluded-ns",
@@ -221,54 +233,72 @@ var _ = Describe("SecretsManager", func() {
 	})
 
 	Context("SecretDefinitionReconciler.Reconcile", func() {
+
 		It("Create a secretdefinition and read the secret", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			err := r.Create(context.Background(), sd)
-			Expect(err).To(BeNil())
+			// setup:
+			secretdefinition := sd
+
+			// when:
+			err := r.Create(context.Background(), secretdefinition)
 			res, err2 := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: sd.Namespace,
-					Name:      sd.Name,
+					Namespace: secretdefinition.Namespace,
+					Name:      secretdefinition.Name,
 				},
 			})
+			data, err3 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+
+			// then:
+			Expect(err).To(BeNil())
 
 			Expect(res).ToNot(BeNil())
 			Expect(err2).To(BeNil())
 
-			data, err3 := r.getCurrentState("default", "secret-test")
 			Expect(err3).To(BeNil())
-			Expect(data).To(Equal(map[string][]byte{"foo": decodedBytes}))
+			Expect(data).To(Equal(anyData))
 		})
 
 		It("Delete a secretdefinition should delete a secret", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			err := r.Create(context.Background(), sd2)
-			Expect(err).To(BeNil())
+			// setup:
+			secretdefinition := sd2
+
+			// when:
+			err := r.Create(context.Background(), secretdefinition)
 			res, err2 := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: sd2.Namespace,
-					Name:      sd2.Name,
+					Namespace: secretdefinition.Namespace,
+					Name:      secretdefinition.Name,
 				},
 			})
 
+			// then:
+			Expect(err).To(BeNil())
 			Expect(res).ToNot(BeNil())
 			Expect(err2).To(BeNil())
-			Expect(sd2.ObjectMeta.Finalizers).To(BeEmpty())
+			Expect(secretdefinition.ObjectMeta.Finalizers).To(BeEmpty())
 
-			data, err3 := r.getCurrentState("default", "secret-test2")
+			// when:
+			data, err3 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+
+			// then:
 			Expect(err3).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"foo2": decodedBytes}))
 
-			err4 := r.Delete(context.Background(), sd2)
-			Expect(err4).To(BeNil())
+			// when:
+			err4 := r.Delete(context.Background(), secretdefinition)
 			res, err5 := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: sd2.Namespace,
-					Name:      sd2.Name,
+					Namespace: secretdefinition.Namespace,
+					Name:      secretdefinition.Name,
 				},
 			})
+			data2, err6 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+
+			// then:
+			Expect(err4).To(BeNil())
+
 			Expect(err5).To(BeNil())
-			data2, err6 := r.getCurrentState("default", "secret-test2")
+
 			Expect(err6).ToNot(BeNil())
 			Expect(data2).To(BeEmpty())
 		})
@@ -297,100 +327,84 @@ var _ = Describe("SecretsManager", func() {
 			Expect(reflect.TypeOf(err2)).To(Equal(reflect.TypeOf(expectedErr)))
 			Expect(res).To(Equal(reconcile.Result{}))
 		})
-		It("Create a secretdefinition and read the labels and annotations", func() {
-			err := r.Create(context.Background(), sdWithLabels)
-			Expect(err).To(BeNil())
-			res, err2 := r.Reconcile(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: sdWithLabels.Namespace,
-					Name:      sdWithLabels.Name,
-				},
-			})
-			Expect(res).ToNot(BeNil())
-			Expect(err2).To(BeNil())
-
-			_, err3 := r.getCurrentState("default", "secret-labels")
-			Expect(err3).To(BeNil())
-
-			reader := r.APIReader
-			secret := &corev1.Secret{}
-			err4 := reader.Get(r.Ctx, client.ObjectKey{
-				Namespace: sdWithLabels.Namespace,
-				Name:      "secret-labels",
-			}, secret)
-			Expect(err4).To(BeNil())
-
-			labels := secret.GetObjectMeta().GetLabels()
-			Expect(labels).To(Equal(map[string]string{
-				"app.kubernetes.io/managed-by": "secrets-manager",
-				"name":                         "secret-labels",
-				"test.example.com/name":        "test"}))
-
-			annotations := secret.GetObjectMeta().GetAnnotations()
-			// lastUpdateTime annotation is created
-			_, ok := annotations["secrets-manager.tuenti.io/lastUpdateTime"]
-			Expect(ok).To(BeTrue())
-			// annotations from the SecretDef are passed to the secret
-			Expect(annotations["tekton.dev/git-0"]).To(Equal("github.com"))
-			// annotations to be skipped are not copied
-			_, ok2 := annotations["kubernetes.io/last-applied-configuration"]
-			Expect(ok2).ToNot(BeNil())
-		})
-		It("Create a secretdefinition in a non-watched namespace", func() {
-			r2 := getReconciler()
-			r2.WatchNamespaces = map[string]bool{"watch": true}
-			err := r.Create(context.Background(), sd3)
-			res, err2 := r.Reconcile(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: sd3.Namespace,
-					Name:      sd3.Name,
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(err2).To(BeNil())
-			Expect(res).To(Equal(reconcile.Result{}))
-		})
-		It("Create a secretdefinition in a watched namespace", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			r2 := getReconciler()
-			r2.WatchNamespaces = map[string]bool{sd4.Namespace: true}
-			err := r.Create(context.Background(), sd4)
-			res, err2 := r.Reconcile(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: sd4.Namespace,
-					Name:      sd4.Name,
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(err2).To(BeNil())
-			Expect(res).ToNot(BeNil())
-
-			data, err3 := r.getCurrentState("default", "secret-test4")
-			Expect(err3).To(BeNil())
-			Expect(data).To(Equal(map[string][]byte{"foo4": decodedBytes}))
-		})
 		It("Create a secretdefinition in a excluded namespace", func() {
+			// setup:
+			secretdefinition := sdExcludedNs
 			r2 := getReconciler()
-			r2.ExcludeNamespaces = map[string]bool{sdExcludedNs.Namespace: true}
-			err := r.Create(context.Background(), sdExcludedNs)
+			r2.ExcludeNamespaces = map[string]bool{secretdefinition.Namespace: true}
+
+			// when:
+			err := r.Create(context.Background(), secretdefinition)
 			res, err2 := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: sdExcludedNs.Namespace,
-					Name:      sdExcludedNs.Name,
+					Namespace: secretdefinition.Namespace,
+					Name:      secretdefinition.Name,
 				},
 			})
+
+			// then:
 			Expect(err).To(BeNil())
+
 			Expect(err2).To(BeNil())
 			Expect(res).To(Equal(reconcile.Result{}))
 		})
 	})
 	Context("SecretDefinitionReconciler.upsertSecret", func() {
+
 		It("Upsert a secret twice should not raise an error", func() {
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			err := r.upsertSecret(sd, map[string][]byte{"foo": decodedBytes})
+			// setup:
+			secretdefinition := sd
+
+			// when:
+			err := r.upsertSecret(secretdefinition, anyData)
+			err2 := r.upsertSecret(secretdefinition, anyData)
+
+			// then:
 			Expect(err).To(BeNil())
-			err2 := r.upsertSecret(sd, map[string][]byte{"foo": decodedBytes})
 			Expect(err2).To(BeNil())
+		})
+		It("Upsert a secret", func() {
+			// setup:
+			secretdefinition := sd
+
+			// when:
+			err := r.upsertSecret(secretdefinition, anyData)
+
+			// then:
+			Expect(err).To(BeNil())
+		})
+	})
+	Context("SecretDefinitionReconciler.getObjectMetaFromSecretDefinition", func() {
+
+		It("getObjectMetaFromSecretDefinition should return an ObjectMeta", func() {
+			// when:
+			objectMeta := getObjectMetaFromSecretDefinition(sd)
+
+			// then:
+			Expect(sd.Namespace).To(Equal(objectMeta.Namespace))
+			Expect(sd.Name).To(Equal(objectMeta.Name))
+
+			for k, _ := range sd.Labels {
+				Expect(objectMeta.Labels).Should(HaveKey(k))
+			}
+			for k, _ := range sd.Annotations {
+				Expect(objectMeta.Annotations).Should(HaveKey(k))
+			}
+		})
+		It("getObjectMetaFromSecretDefinition should add custom labels and annotations to the objectMeta", func() {
+			// when:
+			objectMeta := getObjectMetaFromSecretDefinition(sd)
+
+			// then:
+			Expect(objectMeta.Labels).Should(HaveKey("app.kubernetes.io/managed-by"))
+			Expect(objectMeta.Annotations).Should(HaveKey("secrets-manager.tuenti.io/lastUpdateTime"))
+		})
+		It("getObjectMetaFromSecretDefinition should skip expected annotations", func() {
+			// when:
+			objectMeta := getObjectMetaFromSecretDefinition(sdWithSkipAnnotations)
+
+			// then:
+			Expect(objectMeta.Labels).Should(Not(HaveKey(corev1.LastAppliedConfigAnnotation)))
 		})
 	})
 	Context("Manager.MultiNamespacedCache", func() {
