@@ -1,3 +1,15 @@
+## Pending to release
+
+- [UPGRADE] Upgrade apiextensions.k8s.io from *v1beta1* to *v1*
+- [FEATURE] Populating Labels and Annotations from the SecretDefinition to the generated Secret.
+- [FEATURE] Updates the `managed-by` and `updatedAt` labels to more closely match k8s recommended values (using annotations and recommended labels), as seen below:
+```yaml
+annotations:
+    secrets-manager.tuenti.io/lastUpdateTime: 2020-04-22T14.34.17Z
+labels:
+   app.kubernetes.io/managed-by: secrets-manager
+```
+
 ## v1.1.0 2021-01-05
 
 - [BEHAVIOUR] Using flags watch-namespaces / exclude-namespaces. They interact differently.
