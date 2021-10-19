@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -92,8 +93,22 @@ func vaultClient(l logr.Logger, cfg Config) (*client, error) {
 		"vault_url", cfg.VaultURL,
 		"vault_engine", cfg.VaultEngine)
 
+	var tr http.RoundTripper = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: -1 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		TLSHandshakeTimeout:   30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConnsPerHost:   1,
+		IdleConnTimeout:       1,
+		DisableKeepAlives:     true,
+	}
 	httpClient := new(http.Client)
 	httpClient.Timeout = cfg.BackendTimeout
+	httpClient.Transport = tr
 
 	vclient, err := api.NewClient(&api.Config{Address: cfg.VaultURL, HttpClient: httpClient})
 

@@ -1,19 +1,46 @@
+
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
   - ""
-  - secrets-manager.tuenti.io
   resources:
   - secrets
-  - secretdefinitions
   verbs:
+  - create
+  - delete
   - get
   - list
-  - watch
-  - update
   - patch
-  - delete
+  - update
+  - watch
+- apiGroups:
+  - secrets-manager.tuenti.io
+  resources:
+  - secretdefinitions
+  verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - secrets-manager.tuenti.io
+  resources:
+  - secretdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - secrets-manager.tuenti.io
+  resources:
+  - secretdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update

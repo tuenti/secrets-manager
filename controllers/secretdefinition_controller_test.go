@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"encoding/base64"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,9 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -29,13 +25,13 @@ const (
 
 var _ = Describe("SecretsManager", func() {
 	var (
-		cfg *rest.Config
-		r   *SecretDefinitionReconciler
+		//cfg *rest.Config
+		r *SecretDefinitionReconciler
 
 		decodedBytes, _ = base64.StdEncoding.DecodeString(encodedValue)
-		anyData = map[string][]byte{"foo": decodedBytes}
+		anyData         = map[string][]byte{"foo": decodedBytes}
 
-		sd  = &smv1alpha1.SecretDefinition{
+		sd = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secret-test",
@@ -60,7 +56,7 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sdWithSkipAnnotations  = &smv1alpha1.SecretDefinition{
+		sdWithSkipAnnotations = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "secret-test",
@@ -69,8 +65,8 @@ var _ = Describe("SecretsManager", func() {
 					"name":                  "secret_labels",
 				},
 				Annotations: map[string]string{
-					"ann1": "another_value",
-					"ann2": "just_a_value",
+					"ann1":                             "another_value",
+					"ann2":                             "just_a_value",
 					corev1.LastAppliedConfigAnnotation: "to_be_skipped",
 				},
 			},
@@ -103,74 +99,74 @@ var _ = Describe("SecretsManager", func() {
 				},
 			},
 		}
-		sdNotWatched = &smv1alpha1.SecretDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "notwatched",
-				Name:      "secret-notwatched",
-			},
-			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-notwatched",
-				Type: "Opaque",
-				KeysMap: map[string]smv1alpha1.DataSource{
-					"notwatched": smv1alpha1.DataSource{
-						Path:     "secret/data/pathtosecret1",
-						Key:      "value",
-						Encoding: "base64",
-					},
-				},
-			},
-		}
-		sdWatched = &smv1alpha1.SecretDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "watched",
-				Name:      "secret-watched",
-			},
-			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-watched",
-				Type: "Opaque",
-				KeysMap: map[string]smv1alpha1.DataSource{
-					"watched": smv1alpha1.DataSource{
-						Path:     "secret/data/pathtosecret1",
-						Key:      "value",
-						Encoding: "base64",
-					},
-				},
-			},
-		}
-		sdMultiWatched1 = &smv1alpha1.SecretDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "watched1",
-				Name:      "secret-multi1",
-			},
-			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-multi1",
-				Type: "Opaque",
-				KeysMap: map[string]smv1alpha1.DataSource{
-					"multival1": smv1alpha1.DataSource{
-						Path:     "secret/data/pathtosecret1",
-						Key:      "value",
-						Encoding: "base64",
-					},
-				},
-			},
-		}
-		sdMultiWatched2 = &smv1alpha1.SecretDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "watched2",
-				Name:      "secret-multi2",
-			},
-			Spec: smv1alpha1.SecretDefinitionSpec{
-				Name: "secret-multi2",
-				Type: "Opaque",
-				KeysMap: map[string]smv1alpha1.DataSource{
-					"multival2": smv1alpha1.DataSource{
-						Path:     "secret/data/pathtosecret1",
-						Key:      "value",
-						Encoding: "base64",
-					},
-				},
-			},
-		}
+		//		sdNotWatched = &smv1alpha1.SecretDefinition{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Namespace: "notwatched",
+		//				Name:      "secret-notwatched",
+		//			},
+		//			Spec: smv1alpha1.SecretDefinitionSpec{
+		//				Name: "secret-notwatched",
+		//				Type: "Opaque",
+		//				KeysMap: map[string]smv1alpha1.DataSource{
+		//					"notwatched": smv1alpha1.DataSource{
+		//						Path:     "secret/data/pathtosecret1",
+		//						Key:      "value",
+		//						Encoding: "base64",
+		//					},
+		//				},
+		//			},
+		//		}
+		//		sdWatched = &smv1alpha1.SecretDefinition{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Namespace: "watched",
+		//				Name:      "secret-watched",
+		//			},
+		//			Spec: smv1alpha1.SecretDefinitionSpec{
+		//				Name: "secret-watched",
+		//				Type: "Opaque",
+		//				KeysMap: map[string]smv1alpha1.DataSource{
+		//					"watched": smv1alpha1.DataSource{
+		//						Path:     "secret/data/pathtosecret1",
+		//						Key:      "value",
+		//						Encoding: "base64",
+		//					},
+		//				},
+		//			},
+		//		}
+		//		sdMultiWatched1 = &smv1alpha1.SecretDefinition{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Namespace: "watched1",
+		//				Name:      "secret-multi1",
+		//			},
+		//			Spec: smv1alpha1.SecretDefinitionSpec{
+		//				Name: "secret-multi1",
+		//				Type: "Opaque",
+		//				KeysMap: map[string]smv1alpha1.DataSource{
+		//					"multival1": smv1alpha1.DataSource{
+		//						Path:     "secret/data/pathtosecret1",
+		//						Key:      "value",
+		//						Encoding: "base64",
+		//					},
+		//				},
+		//			},
+		//		}
+		//		sdMultiWatched2 = &smv1alpha1.SecretDefinition{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Namespace: "watched2",
+		//				Name:      "secret-multi2",
+		//			},
+		//			Spec: smv1alpha1.SecretDefinitionSpec{
+		//				Name: "secret-multi2",
+		//				Type: "Opaque",
+		//				KeysMap: map[string]smv1alpha1.DataSource{
+		//					"multival2": smv1alpha1.DataSource{
+		//						Path:     "secret/data/pathtosecret1",
+		//						Key:      "value",
+		//						Encoding: "base64",
+		//					},
+		//				},
+		//			},
+		//		}
 		sdBackendSecretNotFound = &smv1alpha1.SecretDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
@@ -240,7 +236,7 @@ var _ = Describe("SecretsManager", func() {
 
 			// when:
 			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(reconcile.Request{
+			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -264,7 +260,7 @@ var _ = Describe("SecretsManager", func() {
 
 			// when:
 			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(reconcile.Request{
+			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -286,7 +282,7 @@ var _ = Describe("SecretsManager", func() {
 
 			// when:
 			err4 := r.Delete(context.Background(), secretdefinition)
-			res, err5 := r.Reconcile(reconcile.Request{
+			res, err5 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -305,7 +301,7 @@ var _ = Describe("SecretsManager", func() {
 		It("Create a secretdefinition with a secret not deployed in the backend", func() {
 			err := r.Create(context.Background(), sdBackendSecretNotFound)
 			Expect(err).To(BeNil())
-			res, err2 := r.Reconcile(reconcile.Request{
+			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: sdBackendSecretNotFound.Namespace,
 					Name:      sdBackendSecretNotFound.Name,
@@ -318,7 +314,7 @@ var _ = Describe("SecretsManager", func() {
 			expectedErr := &errors.EncodingNotImplementedError{}
 			err := r.Create(context.Background(), sdWrongEncoding)
 			Expect(err).To(BeNil())
-			res, err2 := r.Reconcile(reconcile.Request{
+			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: sdWrongEncoding.Namespace,
 					Name:      sdWrongEncoding.Name,
@@ -335,7 +331,7 @@ var _ = Describe("SecretsManager", func() {
 
 			// when:
 			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(reconcile.Request{
+			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -407,107 +403,110 @@ var _ = Describe("SecretsManager", func() {
 			Expect(objectMeta.Labels).Should(Not(HaveKey(corev1.LastAppliedConfigAnnotation)))
 		})
 	})
-	Context("Manager.MultiNamespacedCache", func() {
-
-		It("Creates secret in watched namespace", func(done Done) {
-			scheme := getScheme()
-
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-				Scheme:             scheme,
-				MetricsBindAddress: "0",
-				LeaderElection:     false,
-				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched"}),
-			})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mgr).ToNot(BeNil())
-			r2 := getReconciler()
-			r2.SetupWithManager(mgr, "test1")
-
-			c1 := make(chan struct{})
-			go func() {
-				defer GinkgoRecover()
-				Expect(mgr.Start(c1)).NotTo(HaveOccurred())
-				close(done)
-			}()
-
-			r2.Create(context.Background(), sdWatched)
-			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
-			time.Sleep(4 * time.Second)
-			data, err := r2.getCurrentState("watched", sdWatched.Spec.Name)
-			Expect(err).To(BeNil())
-			Expect(data).To(Equal(map[string][]byte{"watched": decodedBytes}))
-			close(c1)
-
-		}, 10)
-
-		It("Doesn't create secret in unwatched namespace", func(done Done) {
-			scheme := getScheme()
-
-			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-				Scheme:             scheme,
-				MetricsBindAddress: "0",
-				LeaderElection:     false,
-				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched"}),
-			})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mgr).ToNot(BeNil())
-			r2 := getReconciler()
-			r2.SetupWithManager(mgr, "test2")
-
-			c1 := make(chan struct{})
-			go func() {
-				defer GinkgoRecover()
-				Expect(mgr.Start(c1)).NotTo(HaveOccurred())
-				close(done)
-			}()
-
-			r2.Create(context.Background(), sdNotWatched)
-			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
-			time.Sleep(4 * time.Second)
-			data, err := r2.getCurrentState("notwatched", sdNotWatched.Spec.Name)
-			Expect(err.Error()).To(Equal("secrets \"secret-notwatched\" not found"))
-			Expect(data).To(BeEmpty())
-			close(c1)
-
-		}, 10)
-
-		It("Creates secrets in multiple watched namespaces", func(done Done) {
-			scheme := getScheme()
-
-			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
-			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-				Scheme:             scheme,
-				MetricsBindAddress: "0",
-				LeaderElection:     false,
-				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched1", "watched2"}),
-			})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mgr).ToNot(BeNil())
-			r2 := getReconciler()
-			r2.SetupWithManager(mgr, "test3")
-
-			c1 := make(chan struct{})
-			go func() {
-				defer GinkgoRecover()
-				Expect(mgr.Start(c1)).NotTo(HaveOccurred())
-				close(done)
-			}()
-
-			r2.Create(context.Background(), sdMultiWatched1)
-			r2.Create(context.Background(), sdMultiWatched2)
-			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
-			time.Sleep(4 * time.Second)
-			data, err2 := r2.getCurrentState("watched1", sdMultiWatched1.Spec.Name)
-			Expect(err2).To(BeNil())
-			Expect(data).To(Equal(map[string][]byte{"multival1": decodedBytes}))
-
-			data2, err3 := r2.getCurrentState("watched2", sdMultiWatched2.Spec.Name)
-			Expect(err3).To(BeNil())
-			Expect(data2).To(Equal(map[string][]byte{"multival2": decodedBytes}))
-
-			close(c1)
-
-		}, 10)
-	})
+	//	Context("Manager.MultiNamespacedCache", func() {
+	//
+	//		It("Creates secret in watched namespace", func(done Done) {
+	//			scheme := getScheme()
+	//
+	//			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
+	//			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+	//				Scheme:             scheme,
+	//				MetricsBindAddress: "0",
+	//				LeaderElection:     false,
+	//				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched"}),
+	//			})
+	//			Expect(err).ToNot(HaveOccurred())
+	//			Expect(mgr).ToNot(BeNil())
+	//			r2 := getReconciler()
+	//			r2.SetupWithManager(mgr, "test1")
+	//
+	//			c1 := make(chan struct{})
+	//			go func() {
+	//				defer GinkgoRecover()
+	//				//Expect(mgr.Start(c1)).NotTo(HaveOccurred())
+	//				Expect(mgr.Start(context.Background())).NotTo(HaveOccurred())
+	//				close(done)
+	//			}()
+	//
+	//			r2.Create(context.Background(), sdWatched)
+	//			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
+	//			time.Sleep(4 * time.Second)
+	//			data, err := r2.getCurrentState("watched", sdWatched.Spec.Name)
+	//			Expect(err).To(BeNil())
+	//			Expect(data).To(Equal(map[string][]byte{"watched": decodedBytes}))
+	//			close(c1)
+	//
+	//		}, 10)
+	//
+	//		It("Doesn't create secret in unwatched namespace", func(done Done) {
+	//			scheme := getScheme()
+	//
+	//			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+	//				Scheme:             scheme,
+	//				MetricsBindAddress: "0",
+	//				LeaderElection:     false,
+	//				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched"}),
+	//			})
+	//			Expect(err).ToNot(HaveOccurred())
+	//			Expect(mgr).ToNot(BeNil())
+	//			r2 := getReconciler()
+	//			r2.SetupWithManager(mgr, "test2")
+	//
+	//			c1 := make(chan struct{})
+	//			go func() {
+	//				defer GinkgoRecover()
+	//				//Expect(mgr.Start(c1)).NotTo(HaveOccurred())
+	//				Expect(mgr.Start(context.Background())).NotTo(HaveOccurred())
+	//				close(done)
+	//			}()
+	//
+	//			r2.Create(context.Background(), sdNotWatched)
+	//			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
+	//			time.Sleep(4 * time.Second)
+	//			data, err := r2.getCurrentState("notwatched", sdNotWatched.Spec.Name)
+	//			Expect(err.Error()).To(Equal("secrets \"secret-notwatched\" not found"))
+	//			Expect(data).To(BeEmpty())
+	//			close(c1)
+	//
+	//		}, 10)
+	//
+	//		It("Creates secrets in multiple watched namespaces", func(done Done) {
+	//			scheme := getScheme()
+	//
+	//			decodedBytes, _ := base64.StdEncoding.DecodeString(encodedValue)
+	//			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+	//				Scheme:             scheme,
+	//				MetricsBindAddress: "0",
+	//				LeaderElection:     false,
+	//				NewCache:           cache.MultiNamespacedCacheBuilder([]string{"watched1", "watched2"}),
+	//			})
+	//			Expect(err).ToNot(HaveOccurred())
+	//			Expect(mgr).ToNot(BeNil())
+	//			r2 := getReconciler()
+	//			r2.SetupWithManager(mgr, "test3")
+	//
+	//			c1 := make(chan struct{})
+	//			go func() {
+	//				defer GinkgoRecover()
+	//				//Expect(mgr.Start(c1)).NotTo(HaveOccurred())
+	//				Expect(mgr.Start(context.Background())).NotTo(HaveOccurred())
+	//				close(done)
+	//			}()
+	//
+	//			r2.Create(context.Background(), sdMultiWatched1)
+	//			r2.Create(context.Background(), sdMultiWatched2)
+	//			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
+	//			time.Sleep(4 * time.Second)
+	//			data, err2 := r2.getCurrentState("watched1", sdMultiWatched1.Spec.Name)
+	//			Expect(err2).To(BeNil())
+	//			Expect(data).To(Equal(map[string][]byte{"multival1": decodedBytes}))
+	//
+	//			data2, err3 := r2.getCurrentState("watched2", sdMultiWatched2.Spec.Name)
+	//			Expect(err3).To(BeNil())
+	//			Expect(data2).To(Equal(map[string][]byte{"multival2": decodedBytes}))
+	//
+	//			close(c1)
+	//
+	//		}, 10)
+	//	})
 })
