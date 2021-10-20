@@ -35,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	secretsmanagerv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
@@ -102,14 +103,14 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	logf.SetLogger(logger)
+	backendLog := logf.Log.WithName("backend")
 
 	if versionFlag {
 		fmt.Printf("Secrets Manager %s\n", version)
 		os.Exit(0)
 	}
-	//setupLog.Error(err, "unable to create controller", "controller", "Captain")
-	//logger := zap.Logger(enableDebugLog).WithName("backend")
-	logger := ctrl.Log.WithName("backend")
 
 	if os.Getenv("VAULT_ADDR") != "" {
 		backendCfg.VaultURL = os.Getenv("VAULT_ADDR")
@@ -126,13 +127,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	backendClient, err := backend.NewBackendClient(ctx, selectedBackend, logger, backendCfg)
+	backendClient, err := backend.NewBackendClient(ctx, selectedBackend, backendLog, backendCfg)
 	if err != nil {
 		logger.Error(err, "could not build backend client")
 		os.Exit(1)
 	}
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	nsSlice := func(ns string) []string {
 		trimmed := strings.Trim(strings.TrimSpace(ns), "\"")
@@ -175,19 +174,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	//mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-	//	Scheme:                 scheme,
-	//	MetricsBindAddress:     metricsAddr,
-	//	Port:                   9443,
-	//	HealthProbeBindAddress: probeAddr,
-	//	LeaderElection:         enableLeaderElection,
-	//	LeaderElectionID:       "5ac9a181.secrets-manager.tuenti.io",
-	//})
-	//if err != nil {
-	//	setupLog.Error(err, "unable to start manager")
-	//	os.Exit(1)
-	//}
 
 	if err = (&controllers.SecretDefinitionReconciler{
 		Backend:              *backendClient,

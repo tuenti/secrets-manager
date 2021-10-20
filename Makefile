@@ -1,6 +1,13 @@
 
+DOCKER_REGISTRY = "registry.hub.docker.com"
+ORGANIZATION = "tuentitech"
+BINARY_NAME=secrets-manager
+VERSION=$(shell deploy/version/get.sh)
+BUILD_FLAGS=-ldflags "-X main.version=${VERSION}"
+
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG = ${DOCKER_REGISTRY}/${ORGANIZATION}/${BINARY_NAME}:${VERSION}
+
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -50,7 +57,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-# Kube-apiserver for 1.19.0 and later were crashing on start hence below.
+# Kube-apiserver for 1.19.0 and later were crashing on start for some reason when testing hence below.
+# TODO: Work out why later versions were crashing and remove/update
 export ENVTEST_K8S_VERSION=1.17.9
 test: manifests generate fmt vet ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR}
@@ -60,17 +68,38 @@ test: manifests generate fmt vet ## Run tests.
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build ${BUILD_FLAGS} -o bin/${BINARY_NAME} main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+# Run tests in docker
+docker-test:
+	docker-compose run tests
 
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+# Build release docker image
+docker-build: docker-test
+	docker build . \
+		--file ./deploy/Dockerfile \
+		--target release \
+		--build-arg SECRETS_MANAGER_VERSION=${VERSION} \
+		--tag ${IMAGE}
+	@echo "updating kustomize image patch file for manager resource"
+	sed -i'' -e 's@image: .*@image: '"${IMAGE}"'@' ./config/default/manager_image_patch.yaml
+	
+# Push the docker image
+docker-push:
+	docker push ${IMAGE}
 
+update-major-version:
+	deploy/version/update.sh --major
+
+update-minor-version:
+	deploy/version/update.sh --minor
+
+update-patch-version:
+	deploy/version/update.sh --patch 
+	
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.

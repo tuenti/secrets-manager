@@ -1,0 +1,80 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: secretdefinitions.secrets-manager.tuenti.io
+spec:
+  group: secrets-manager.tuenti.io
+  names:
+    kind: SecretDefinition
+    listKind: SecretDefinitionList
+    plural: secretdefinitions
+    singular: secretdefinition
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SecretDefinition is the Schema for the secretdefinitions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SecretDefinitionSpec defines the desired state of SecretDefinition
+            properties:
+              keysMap:
+                additionalProperties:
+                  description: DataSource represents the actual source of truth path
+                    for a secret
+                  properties:
+                    encoding:
+                      description: Encoding type for the secret. Only base64 supported.
+                        Optional
+                      type: string
+                    key:
+                      description: Key where the actual secret is stored
+                      type: string
+                    path:
+                      description: Path to the actual secret
+                      type: string
+                  required:
+                  - key
+                  - path
+                  type: object
+                type: object
+              name:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file'
+                type: string
+              type:
+                type: string
+            required:
+            - keysMap
+            - name
+            type: object
+          status:
+            description: SecretDefinitionStatus defines the observed state of SecretDefinition
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
