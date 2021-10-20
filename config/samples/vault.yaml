@@ -21,6 +21,9 @@ metadata:
     app: vault
   name: vault
 spec:
+  selector:
+    matchLabels:
+      app: vault
   replicas: 1
   template:
     metadata:

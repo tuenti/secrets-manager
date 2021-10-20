@@ -1,5 +1,5 @@
 #!/bin/sh
-VAULT_ADDR=http://localhost:8200
+export VAULT_ADDR=http://localhost:8200
 echo "Waiting vault to launch on 8200..."
 
 while ! nc -z localhost 8200; do   
