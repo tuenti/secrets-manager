@@ -4,7 +4,7 @@
   jobs:
     unit_tests:
       docker:
-      - image: circleci/golang:1.12.5
+      - image: circleci/golang:1.17
       environment:
         KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
       steps:
@@ -21,7 +21,7 @@
 
     docker_hub_master:
       docker:
-      - image: circleci/golang:1.12.5
+      - image: circleci/golang:1.17
       environment:
         KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
       steps:
@@ -35,7 +35,7 @@
 
     docker_hub_release_tags:
       docker:
-      - image: circleci/golang:1.12.5
+      - image: circleci/golang:1.17
       environment:
         KUBEBUILDER_CONTROLPLANE_START_TIMEOUT: "60s"
       steps:
