@@ -26,8 +26,11 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
+	//"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	//"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,7 +38,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	//logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	secretsmanagerv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
@@ -52,7 +56,6 @@ var (
 func init() {
 	corev1.AddToScheme(scheme)
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(secretsmanagerv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -72,6 +75,7 @@ func main() {
 	var excludeNamespaces string
 	var mgr ctrl.Manager
 	var namespaceList []string
+	//var logLevel int
 
 	backendCfg := backend.Config{}
 
@@ -98,14 +102,38 @@ func main() {
 	flag.StringVar(&backendCfg.VaultKubernetesPath, "vault.kubernetes-path", "kubernetes", "Vault kubernetes login path")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "", "Comma separated list of namespaces that secrets-manager will watch for SecretDefinitions. By default all namespaces are watched.")
 	flag.StringVar(&excludeNamespaces, "exclude-namespaces", "", "Comma separated list of namespaces that secrets-manager will not watch for SecretDefinitions. By default all namespaces are watched.")
+
+	//New
 	opts := zap.Options{
-		Development: true,
+		Development: enableDebugLog,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
-	logger := zap.New(zap.UseFlagOptions(&opts))
-	logf.SetLogger(logger)
-	backendLog := logf.Log.WithName("backend")
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	//level := zapcore.Level(-3)
+	//opts := zap.Options{
+	//	Level: level,
+	//}
+	//opts.BindFlags(flag.CommandLine)
+	//flag.Parse()
+
+	//ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	//logger := zap.New(zap.UseFlagOptions(&opts))
+	//logf.SetLogger(logger)
+	backendLog := ctrl.Log.WithName("backend")
+
+	//Orig
+	//opts := zap.Options{
+	//	Development: true,
+	//}
+	//opts.BindFlags(flag.CommandLine)
+	//flag.Parse()
+	//logger := zap.New(zap.UseFlagOptions(&opts))
+	//logf.SetLogger(logger)
+	//backendLog := logf.Log.WithName("backend")
 
 	if versionFlag {
 		fmt.Printf("Secrets Manager %s\n", version)
@@ -129,7 +157,7 @@ func main() {
 
 	backendClient, err := backend.NewBackendClient(ctx, selectedBackend, backendLog, backendCfg)
 	if err != nil {
-		logger.Error(err, "could not build backend client")
+		setupLog.Error(err, "could not build backend client")
 		os.Exit(1)
 	}
 
@@ -146,9 +174,9 @@ func main() {
 	}
 
 	if len(strings.TrimSpace(watchNamespaces)) > 0 {
-		logger.Info("setting restricted namespace list for controller")
+		setupLog.Info("setting restricted namespace list for controller")
 		namespaceList = nsSlice(watchNamespaces)
-		logger.Info("watching namespaces: " + watchNamespaces)
+		setupLog.Info("watching namespaces: " + watchNamespaces)
 		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:                 scheme,
 			MetricsBindAddress:     metricsAddr,
@@ -176,12 +204,10 @@ func main() {
 	}
 
 	if err = (&controllers.SecretDefinitionReconciler{
-		Backend:              *backendClient,
-		Client:               mgr.GetClient(),
-		Scheme:               mgr.GetScheme(),
+		Backend: *backendClient,
+		//Scheme:               mgr.GetScheme(),
 		APIReader:            mgr.GetAPIReader(),
-		Log:                  ctrl.Log.WithName("controllers").WithName(controllerName),
-		Ctx:                  ctx,
+		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
 		ReconciliationPeriod: reconcilePeriod,
 		ExcludeNamespaces:    excludeNs,
 	}).SetupWithManager(mgr, controllerName); err != nil {

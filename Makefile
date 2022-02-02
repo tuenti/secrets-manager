@@ -83,13 +83,13 @@ docker-build: docker-test
 		--file ./deploy/Dockerfile \
 		--target release \
 		--build-arg SECRETS_MANAGER_VERSION=${VERSION} \
-		--tag ${IMAGE}
+		--tag ${IMG}
 	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMAGE}"'@' ./config/default/manager_image_patch.yaml
-	
+	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+
 # Push the docker image
 docker-push:
-	docker push ${IMAGE}
+	docker push ${IMG}
 
 update-major-version:
 	deploy/version/update.sh --major
@@ -98,8 +98,8 @@ update-minor-version:
 	deploy/version/update.sh --minor
 
 update-patch-version:
-	deploy/version/update.sh --patch 
-	
+	deploy/version/update.sh --patch
+
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.

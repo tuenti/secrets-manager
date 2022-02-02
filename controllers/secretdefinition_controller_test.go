@@ -236,16 +236,17 @@ var _ = Describe("SecretsManager", func() {
 		It("Create a secretdefinition and read the secret", func() {
 			// setup:
 			secretdefinition := sd
+			ctx := context.Background()
 
 			// when:
-			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
+			err := r.Create(ctx, secretdefinition)
+			res, err2 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
 				},
 			})
-			data, err3 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+			data, err3 := r.getCurrentState(ctx, "default", secretdefinition.ObjectMeta.Name)
 
 			// then:
 			Expect(err).To(BeNil())
@@ -260,10 +261,11 @@ var _ = Describe("SecretsManager", func() {
 		It("Delete a secretdefinition should delete a secret", func() {
 			// setup:
 			secretdefinition := sd2
+			ctx := context.Background()
 
 			// when:
-			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
+			err := r.Create(ctx, secretdefinition)
+			res, err2 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -277,34 +279,42 @@ var _ = Describe("SecretsManager", func() {
 			Expect(secretdefinition.ObjectMeta.Finalizers).To(BeEmpty())
 
 			// when:
-			data, err3 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+			data, err3 := r.getCurrentState(ctx, "default", secretdefinition.ObjectMeta.Name)
 
 			// then:
 			Expect(err3).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"foo2": decodedBytes}))
 
 			// when:
-			err4 := r.Delete(context.Background(), secretdefinition)
-			res, err5 := r.Reconcile(context.Background(), reconcile.Request{
+			err4 := r.Delete(ctx, secretdefinition)
+			res, err5 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
 				},
 			})
-			data2, err6 := r.getCurrentState("default", secretdefinition.ObjectMeta.Name)
+			data2, err6 := r.getCurrentState(ctx, "default", secretdefinition.ObjectMeta.Name)
 
 			// then:
 			Expect(err4).To(BeNil())
-
 			Expect(err5).To(BeNil())
-
 			Expect(err6).ToNot(BeNil())
 			Expect(data2).To(BeEmpty())
+
+			// when:
+			res, err10 := r.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: secretdefinition.Namespace,
+					Name:      secretdefinition.Name,
+				},
+			})
+			Expect(err10).To(BeNil())
 		})
 		It("Create a secretdefinition with a secret not deployed in the backend", func() {
-			err := r.Create(context.Background(), sdBackendSecretNotFound)
+			ctx := context.Background()
+			err := r.Create(ctx, sdBackendSecretNotFound)
 			Expect(err).To(BeNil())
-			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
+			res, err2 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: sdBackendSecretNotFound.Namespace,
 					Name:      sdBackendSecretNotFound.Name,
@@ -314,10 +324,11 @@ var _ = Describe("SecretsManager", func() {
 			Expect(res).To(Equal(reconcile.Result{}))
 		})
 		It("Create a secretdefinition with a wrong encoding", func() {
+			ctx := context.Background()
 			expectedErr := &errors.EncodingNotImplementedError{}
-			err := r.Create(context.Background(), sdWrongEncoding)
+			err := r.Create(ctx, sdWrongEncoding)
 			Expect(err).To(BeNil())
-			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
+			res, err2 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: sdWrongEncoding.Namespace,
 					Name:      sdWrongEncoding.Name,
@@ -331,10 +342,11 @@ var _ = Describe("SecretsManager", func() {
 			secretdefinition := sdExcludedNs
 			r2 := getReconciler()
 			r2.ExcludeNamespaces = map[string]bool{secretdefinition.Namespace: true}
+			ctx := context.Background()
 
 			// when:
-			err := r.Create(context.Background(), secretdefinition)
-			res, err2 := r.Reconcile(context.Background(), reconcile.Request{
+			err := r.Create(ctx, secretdefinition)
+			res, err2 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
@@ -353,10 +365,11 @@ var _ = Describe("SecretsManager", func() {
 		It("Upsert a secret twice should not raise an error", func() {
 			// setup:
 			secretdefinition := sd
+			ctx := context.Background()
 
 			// when:
-			err := r.upsertSecret(secretdefinition, anyData)
-			err2 := r.upsertSecret(secretdefinition, anyData)
+			err := r.upsertSecret(ctx, secretdefinition, anyData)
+			err2 := r.upsertSecret(ctx, secretdefinition, anyData)
 
 			// then:
 			Expect(err).To(BeNil())
@@ -365,9 +378,10 @@ var _ = Describe("SecretsManager", func() {
 		It("Upsert a secret", func() {
 			// setup:
 			secretdefinition := sd
+			ctx := context.Background()
 
 			// when:
-			err := r.upsertSecret(secretdefinition, anyData)
+			err := r.upsertSecret(ctx, secretdefinition, anyData)
 
 			// then:
 			Expect(err).To(BeNil())
@@ -433,10 +447,10 @@ var _ = Describe("SecretsManager", func() {
 				close(done)
 			}()
 
-			r2.Create(context.Background(), sdWatched)
+			r2.Create(ctx, sdWatched)
 			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
 			time.Sleep(4 * time.Second)
-			data, err := r2.getCurrentState("watched", sdWatched.Spec.Name)
+			data, err := r2.getCurrentState(ctx, "watched", sdWatched.Spec.Name)
 			Expect(err).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"watched": decodedBytes}))
 			cancelfunc()
@@ -464,10 +478,10 @@ var _ = Describe("SecretsManager", func() {
 				close(done)
 			}()
 
-			r2.Create(context.Background(), sdNotWatched)
+			r2.Create(ctx, sdNotWatched)
 			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
 			time.Sleep(4 * time.Second)
-			data, err := r2.getCurrentState("notwatched", sdNotWatched.Spec.Name)
+			data, err := r2.getCurrentState(ctx, "notwatched", sdNotWatched.Spec.Name)
 			Expect(err.Error()).To(Equal("secrets \"secret-notwatched\" not found"))
 			Expect(data).To(BeEmpty())
 			cancelfunc()
@@ -497,15 +511,15 @@ var _ = Describe("SecretsManager", func() {
 				close(done)
 			}()
 
-			r2.Create(context.Background(), sdMultiWatched1)
-			r2.Create(context.Background(), sdMultiWatched2)
+			r2.Create(ctx, sdMultiWatched1)
+			r2.Create(ctx, sdMultiWatched2)
 			// Sleep for 4 * the reconcile interval set on the controller (just to be safe)
 			time.Sleep(4 * time.Second)
-			data, err2 := r2.getCurrentState("watched1", sdMultiWatched1.Spec.Name)
+			data, err2 := r2.getCurrentState(ctx, "watched1", sdMultiWatched1.Spec.Name)
 			Expect(err2).To(BeNil())
 			Expect(data).To(Equal(map[string][]byte{"multival1": decodedBytes}))
 
-			data2, err3 := r2.getCurrentState("watched2", sdMultiWatched2.Spec.Name)
+			data2, err3 := r2.getCurrentState(ctx, "watched2", sdMultiWatched2.Spec.Name)
 			Expect(err3).To(BeNil())
 			Expect(data2).To(Equal(map[string][]byte{"multival2": decodedBytes}))
 

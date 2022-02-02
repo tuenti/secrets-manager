@@ -142,9 +142,8 @@ var _ = BeforeSuite(func(done Done) {
 		}),
 		Client:               k8sClient,
 		APIReader:            k8sClient,
-		Log:                  logf.Log.WithName("controllers-test").WithName("SecretDefinition"),
-		Ctx:                  context.Background(),
 		ReconciliationPeriod: 1 * time.Second,
+		Log:                  logf.Log.WithName("controllers-test").WithName("SecretDefinition"),
 	}
 	err = r.SetupWithManager(mgr, "testing")
 	//Expect(err).ToNot(HaveOccurred())*/

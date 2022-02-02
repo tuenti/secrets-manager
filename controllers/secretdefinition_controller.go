@@ -22,17 +22,17 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/go-logr/logr"
+	smv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
+	"github.com/tuenti/secrets-manager/backend"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/go-logr/logr"
-	smv1alpha1 "github.com/tuenti/secrets-manager/api/v1alpha1"
-	"github.com/tuenti/secrets-manager/backend"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	//"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -48,7 +48,6 @@ type SecretDefinitionReconciler struct {
 	client.Client
 	Backend              backend.Client
 	Log                  logr.Logger
-	Ctx                  context.Context
 	APIReader            client.Reader
 	ReconciliationPeriod time.Duration
 	ExcludeNamespaces    map[string]bool
@@ -122,6 +121,7 @@ func isNotMarkedForRemoval(sDef smv1alpha1.SecretDefinition) bool {
 
 // getDesiredState reads the content from the Datasource for later comparison
 func (r *SecretDefinitionReconciler) getDesiredState(keysMap map[string]smv1alpha1.DataSource) (map[string][]byte, error) {
+
 	desiredState := make(map[string][]byte)
 	var err error
 	for k, v := range keysMap {
@@ -145,12 +145,12 @@ func (r *SecretDefinitionReconciler) getDesiredState(keysMap map[string]smv1alph
 }
 
 // getCurrentState reads the content from the Kubernetes Secret API object for later comparison
-func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name string) (map[string][]byte, error) {
+func (r *SecretDefinitionReconciler) getCurrentState(ctx context.Context, namespace string, name string) (map[string][]byte, error) {
 	// We don't read secrets from cache, as it's not the object we reconcile
 	reader := r.APIReader
 	data := make(map[string][]byte)
 	secret := &corev1.Secret{}
-	err := reader.Get(r.Ctx, client.ObjectKey{
+	err := reader.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
 		Name:      name,
 	}, secret)
@@ -163,24 +163,24 @@ func (r *SecretDefinitionReconciler) getCurrentState(namespace string, name stri
 }
 
 // upsertSecret will create or update a secret
-func (r *SecretDefinitionReconciler) upsertSecret(sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
+func (r *SecretDefinitionReconciler) upsertSecret(ctx context.Context, sDef *smv1alpha1.SecretDefinition, data map[string][]byte) error {
 	secret := getSecretFromSecretDefinition(sDef, data)
-	err := r.Create(r.Ctx, secret)
+	err := r.Create(ctx, secret)
 	if errors.IsAlreadyExists(err) {
-		err = r.Update(r.Ctx, secret)
+		err = r.Update(ctx, secret)
 	}
 	return err
 }
 
 // deleteSecret will delete a secret given its namespace and name
-func (r *SecretDefinitionReconciler) deleteSecret(namespace string, name string) error {
+func (r *SecretDefinitionReconciler) deleteSecret(ctx context.Context, namespace string, name string) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 	}
-	return r.Delete(r.Ctx, secret)
+	return r.Delete(ctx, secret)
 }
 
 // shouldExclude will return true if the secretDefinition is in an excluded namespace
@@ -192,10 +192,10 @@ func (r *SecretDefinitionReconciler) shouldExclude(sDefNamespace string) bool {
 }
 
 // AddFinalizerIfNotPresent will check if finalizerName is the finalizers slice
-func (r *SecretDefinitionReconciler) AddFinalizerIfNotPresent(sDef *smv1alpha1.SecretDefinition, finalizerName string) error {
+func (r *SecretDefinitionReconciler) AddFinalizerIfNotPresent(ctx context.Context, sDef *smv1alpha1.SecretDefinition, finalizerName string) error {
 	if !containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
 		sDef.ObjectMeta.Finalizers = append(sDef.ObjectMeta.Finalizers, finalizerName)
-		return r.Update(r.Ctx, sDef)
+		return r.Update(ctx, sDef)
 	}
 	return nil
 }
@@ -235,12 +235,11 @@ func getObjectMetaFromSecretDefinition(sDef *smv1alpha1.SecretDefinition) metav1
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-	log := r.Log.WithValues("secretdefinition", req.NamespacedName)
 
+	log := r.Log.WithValues("secretdefinition", req.NamespacedName)
 	sDef := &smv1alpha1.SecretDefinition{}
 
-	err := r.Get(r.Ctx, req.NamespacedName, sDef)
+	err := r.Get(ctx, req.NamespacedName, sDef)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("could not get SecretDefinition '%s'", req.NamespacedName))
 		return ctrl.Result{}, ignoreNotFoundError(err)
@@ -253,7 +252,7 @@ func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if isNotMarkedForRemoval(*sDef) {
 
-		err = r.AddFinalizerIfNotPresent(sDef, finalizerName)
+		err = r.AddFinalizerIfNotPresent(ctx, sDef, finalizerName)
 		if err != nil {
 			log.Error(err, "unable to update SecretDefinition finalizers", "finalizer", finalizerName)
 			return ctrl.Result{}, err
@@ -274,7 +273,7 @@ func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		// Get the actual secret from Kubernetes
-		currentState, err := r.getCurrentState(secretNamespace, secretName)
+		currentState, err := r.getCurrentState(ctx, secretNamespace, secretName)
 
 		if err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "unable to get current state of secret")
@@ -286,7 +285,7 @@ func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		eq := reflect.DeepEqual(desiredState, currentState)
 		if !eq {
 			log.Info("secret must be updated")
-			if err := r.upsertSecret(sDef, desiredState); err != nil {
+			if err := r.upsertSecret(ctx, sDef, desiredState); err != nil {
 				log.Error(err, "unable to upsert secret")
 				secretSyncErrorsTotal.WithLabelValues(secretNamespace, secretName).Inc()
 				secretLastSyncStatus.WithLabelValues(secretNamespace, secretName).Set(0.0)
@@ -299,19 +298,22 @@ func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	} else {
 		// SecretDefinition has been marked for deletion and contains finalizer
-		if containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
-			if err = r.deleteSecret(secretNamespace, secretName); err != nil && !errors.IsNotFound(err) {
-				log.Error(err, "unable to delete secret")
+		if controllerutil.ContainsFinalizer(sDef, finalizerName) {
+			// our finalizer is present, so lets handle any external dependency
+			if err = r.deleteSecret(ctx, secretNamespace, secretName); err != nil && !errors.IsNotFound(err) {
+				log.Error(err, "Unable to delete secret")
 				return ctrl.Result{}, ignoreNotFoundError(err)
 			}
 			log.Info("secret deleted successfully")
-			// If success remove finalizer
-			sDef.ObjectMeta.Finalizers = removeString(sDef.ObjectMeta.Finalizers, finalizerName)
-			if err = r.Update(r.Ctx, sDef); err != nil {
-				log.Error(err, "unable to remove finalizer from SecretDefinition", "finalizer", finalizerName)
+
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(sDef, finalizerName)
+			if err := r.Update(ctx, sDef); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
+
+		// Stop reconciliation as the item is being deleted
 		return ctrl.Result{}, nil
 	}
 
