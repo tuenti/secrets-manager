@@ -26,15 +26,11 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-
-	//"go.uber.org/zap/zapcore"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	//"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -75,7 +71,6 @@ func main() {
 	var excludeNamespaces string
 	var mgr ctrl.Manager
 	var namespaceList []string
-	//var logLevel int
 
 	backendCfg := backend.Config{}
 
@@ -111,29 +106,7 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	//level := zapcore.Level(-3)
-	//opts := zap.Options{
-	//	Level: level,
-	//}
-	//opts.BindFlags(flag.CommandLine)
-	//flag.Parse()
-
-	//ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	//logger := zap.New(zap.UseFlagOptions(&opts))
-	//logf.SetLogger(logger)
 	backendLog := ctrl.Log.WithName("backend")
-
-	//Orig
-	//opts := zap.Options{
-	//	Development: true,
-	//}
-	//opts.BindFlags(flag.CommandLine)
-	//flag.Parse()
-	//logger := zap.New(zap.UseFlagOptions(&opts))
-	//logf.SetLogger(logger)
-	//backendLog := logf.Log.WithName("backend")
 
 	if versionFlag {
 		fmt.Printf("Secrets Manager %s\n", version)
@@ -204,8 +177,7 @@ func main() {
 	}
 
 	if err = (&controllers.SecretDefinitionReconciler{
-		Backend: *backendClient,
-		//Scheme:               mgr.GetScheme(),
+		Backend:              *backendClient,
 		APIReader:            mgr.GetAPIReader(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
 		ReconciliationPeriod: reconcilePeriod,
