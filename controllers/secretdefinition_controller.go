@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -297,22 +296,19 @@ func (r *SecretDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	} else {
 		// SecretDefinition has been marked for deletion and contains finalizer
-		if controllerutil.ContainsFinalizer(sDef, finalizerName) {
-			// our finalizer is present, so lets handle any external dependency
+		if containsString(sDef.ObjectMeta.Finalizers, finalizerName) {
 			if err = r.deleteSecret(ctx, secretNamespace, secretName); err != nil && !errors.IsNotFound(err) {
-				log.Error(err, "Unable to delete secret")
+				log.Error(err, "unable to delete secret")
 				return ctrl.Result{}, ignoreNotFoundError(err)
 			}
 			log.Info("secret deleted successfully")
-
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(sDef, finalizerName)
-			if err := r.Update(ctx, sDef); err != nil {
+			// If success remove finalizer
+			sDef.ObjectMeta.Finalizers = removeString(sDef.ObjectMeta.Finalizers, finalizerName)
+			if err = r.Update(ctx, sDef); err != nil {
+				log.Error(err, "unable to remove finalizer from SecretDefinition", "finalizer", finalizerName)
 				return ctrl.Result{}, err
 			}
 		}
-
-		// Stop reconciliation as the item is being deleted
 		return ctrl.Result{}, nil
 	}
 

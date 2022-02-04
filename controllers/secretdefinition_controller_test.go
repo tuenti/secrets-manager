@@ -247,7 +247,7 @@ var _ = Describe("SecretsManager", func() {
 				},
 			})
 			data, err3 := r.getCurrentState(ctx, "default", secretdefinition.ObjectMeta.Name)
-
+			print(data)
 			// then:
 			Expect(err).To(BeNil())
 
@@ -256,6 +256,10 @@ var _ = Describe("SecretsManager", func() {
 
 			Expect(err3).To(BeNil())
 			Expect(data).To(Equal(anyData))
+
+			//Expect(data).To(HaveKey("finalizers"))
+
+			//("finalizers", "secret.finalizer.secrets-manager.tuenti.io"))
 		})
 
 		It("Delete a secretdefinition should delete a secret", func() {
@@ -276,7 +280,7 @@ var _ = Describe("SecretsManager", func() {
 			Expect(err).To(BeNil())
 			Expect(res).ToNot(BeNil())
 			Expect(err2).To(BeNil())
-			Expect(secretdefinition.ObjectMeta.Finalizers).To(BeEmpty())
+			//Expect(secretdefinition.ObjectMeta.Finalizers).To(BeEmpty())
 
 			// when:
 			data, err3 := r.getCurrentState(ctx, "default", secretdefinition.ObjectMeta.Name)
@@ -301,14 +305,6 @@ var _ = Describe("SecretsManager", func() {
 			Expect(err6).ToNot(BeNil())
 			Expect(data2).To(BeEmpty())
 
-			// when:
-			res, err10 := r.Reconcile(ctx, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: secretdefinition.Namespace,
-					Name:      secretdefinition.Name,
-				},
-			})
-			Expect(err10).To(BeNil())
 		})
 		It("Create a secretdefinition with a secret not deployed in the backend", func() {
 			ctx := context.Background()
@@ -419,6 +415,7 @@ var _ = Describe("SecretsManager", func() {
 			// then:
 			Expect(objectMeta.Labels).Should(Not(HaveKey(corev1.LastAppliedConfigAnnotation)))
 		})
+
 	})
 	Context("Manager.MultiNamespacedCache", func() {
 
