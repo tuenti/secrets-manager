@@ -322,6 +322,7 @@ func TestVaultLoginKubernetes(t *testing.T) {
 	err2 := c.vaultKubernetesLogin(strings.NewReader(fakeKubernetesSAToken))
 	assert.NotNil(t, err2)
 }
+
 func TestVaultBackendInvalidCfg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -571,7 +572,7 @@ func TestMain(m *testing.M) {
 		invalidSecretID: defaultInvalidAppRole,
 	}
 
-	logger = zap.Logger(false).WithName("vault-test")
+	logger = zap.New(zap.UseDevMode(true))
 
 	os.Exit(m.Run())
 }

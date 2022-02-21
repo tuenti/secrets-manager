@@ -1,7 +1,16 @@
-version: "2"
 domain: secrets-manager.tuenti.io
+layout:
+- go.kubebuilder.io/v3
+projectName: secrets-manager
 repo: github.com/tuenti/secrets-manager
 resources:
-- group: secretsmanager
-  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: secrets-manager.tuenti.io
+  group: secretsmanager
   kind: SecretDefinition
+  path: github.com/tuenti/secrets-manager/api/v1alpha1
+  version: v1alpha1
+version: "3"

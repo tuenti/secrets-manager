@@ -14,13 +14,16 @@ spec:
   selector:
     app: vault
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app: vault
   name: vault
 spec:
+  selector:
+    matchLabels:
+      app: vault
   replicas: 1
   template:
     metadata:
