@@ -13,7 +13,9 @@ import (
 
 var akvMetrics *azureKVMetrics
 
-const ()
+const (
+	azureKVEndpoint = "vault.azure.net"
+)
 
 type azureKVClient struct {
 	client       *keyvault.BaseClient
@@ -38,7 +40,7 @@ func azureKeyVaultClient(l logr.Logger, cfg Config) (*azureKVClient, error) {
 	// There below line was added to access the azure data plane
 	// Which is required to access secrets in keyvault
 
-	clientCredentialConfig.Resource = "https://vault.azure.net"
+	clientCredentialConfig.Resource = fmt.Sprintf("https://%s", azureKVEndpoint)
 	authorizer, err := clientCredentialConfig.Authorizer()
 
 	if err != nil {
@@ -63,7 +65,7 @@ func azureKeyVaultClient(l logr.Logger, cfg Config) (*azureKVClient, error) {
 
 func (c *azureKVClient) ReadSecret(path string, key string) (string, error) {
 	data := ""
-	uri := fmt.Sprintf("https://%s.vault.azure.net", c.keyvaultName)
+	uri := fmt.Sprintf("https://%s.%s", c.keyvaultName, azureKVEndpoint)
 
 	// TODO: Add support for secret version?
 	result, err := c.client.GetSecret(context.Background(), uri, path, "")
