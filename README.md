@@ -72,11 +72,15 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 
 | Flag | Default | Description |
 | ------ | ------- | ------ |
-| `backend`| vault | Selected backend. Only vault supported for now |
+| `backend`| vault | Selected backend. One of vault or azure-kv |
 | `enable-debug-log` | `false` | Enable this to get more logs verbosity and debug messages.|
 | `enable-leader-election` | `false` | Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.|
 | `reconcile-period`| 5s | How often the controller will re-queue secretdefinition events |
 | `config.backend-timeout`| 5s | Backend connection timeout |
+| `azure-kv.name` | `""` | Azure KeyVault name. `AZURE_KV_NAME` environment would take precedence |
+| `azure-kv.tenant-id` | `""` | Azure KeyVault Tenant ID. `AZURE_KV_TENANT_ID` environment would take precedence |
+| `azure-kv.client-id` | `""` | Azure KeyVault Cliend ID used to authenticate. `AZURE_KV_CLIENT_ID` environment would take precedence |
+| `azure-kv.client-secret` | `""` | Azure KeyVault Client Secret used to authenticate. `AZURE_KV_CLIENT_SECRET` environment would take precedence |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
 | `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
@@ -189,11 +193,50 @@ EOF
 $ vault write auth/kubernetes/role/secrets-manager @secrets-manager-role.json
 ```
 
+## Getting Started with Azure KeyVault
+
+### Deploy Azure KeyVault
+
+If you haven't still deployed an Azure KeyVault server, you can do it with Azure CLI:
+
+```
+$ az keyvault create --location <location> --name <keyvault_name> --resource-group <resource_group>
+```
+
+### Create a Service Principal to access secrets
+
+`secrets-manager` uses Azure Service Principal to authenticate against Azure KeyVault API. It's recommended
+to use an isolated Service Principal to limit its access to the least required resources:
+
+```
+$ az ad sp create-for-rbac --name "<service_priciple_name>" --role Contributor --scopes /subscriptions/{SubID}/resourceGroups/{ResourceGroup}
+```
+
+This command will output a JSON object like the following:
+
+```
+{
+  "appId": "<AppID>", // ClientId
+  "displayName": "<ServicePrincipleName>",
+  "name": "http://<ServicePrincipleName>",
+  "password": "<Password>", // ClientSecret
+  "tenant": "<TenantId>"
+}
+```
+
+The fields needed by `secrets-manager` to authenticate are `appId` (`azure-kv.client-id`),
+`password` (`azure-kv.client-secret`) and `tenant` (`azure-kv.tenant-id`).
+
+Once the Service Principal is created, add permission to access Azure KeyVault's secrets with:
+
+```
+$ az keyvault set-policy --name <keyvault_name> --spn <appId> --secret-permissions get list set delete
+```
 
 ## Versioning
 
 Right now versioning it's a manually task.
-Depending on the kind of the update we would apply a major, minor or patch update given that we follow [semantic versionin](https://semver.org/).
+Depending on the kind of the update we would apply a major, minor or patch update given that we follow [semantic versioning](https://semver.org/).
 
 Before building release images, we should run one of the following commands:
 - make update-major-version
