@@ -7,6 +7,7 @@ const (
 	UnknownErrorType                   = "UnknownError"
 	BackendNotImplementedErrorType     = "BackendNotImplementedError"
 	BackendSecretNotFoundErrorType     = "BackendSecretNotFoundError"
+	BackendSecretForbiddenErrorType    = "BackendSecretForbiddenError"
 	K8sSecretNotFoundErrorType         = "K8sSecretNotFoundError"
 	InvalidConfigmapNameErrorType      = "InvalidConfigmapNameError"
 	EncodingNotImplementedErrorType    = "EncodingNotImplementedError"

@@ -9,11 +9,15 @@ import (
 )
 
 const vaultBackendName = "vault"
+const azureKVBackendName = "azure-kv"
 
 var supportedBackends map[string]bool
 
 func init() {
-	supportedBackends = map[string]bool{vaultBackendName: true}
+	supportedBackends = map[string]bool{
+		vaultBackendName:   true,
+		azureKVBackendName: true,
+	}
 }
 
 // Config type represent backend config, and should include all backends config
@@ -30,6 +34,10 @@ type Config struct {
 	VaultEngine             string
 	VaultApprolePath        string
 	VaultKubernetesPath     string
+	AzureKVName             string
+	AzureKVTenantID         string
+	AzureKVClientID         string
+	AzureKVClientSecret     string
 }
 
 // Client interface represent a backend client interface that should be implemented
@@ -55,6 +63,13 @@ func NewBackendClient(ctx context.Context, backend string, logger logr.Logger, c
 		vclient.startTokenRenewer(ctx)
 		client = vclient
 		err = verr
+	case azureKVBackendName:
+		akvclient, akverr := azureKeyVaultClient(logger, cfg)
+		if akverr != nil {
+			return nil, akverr
+		}
+		client = akvclient
+		err = akverr
 	}
 	return &client, err
 }
