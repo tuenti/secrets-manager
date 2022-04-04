@@ -177,6 +177,7 @@ func main() {
 	}
 
 	if err = (&controllers.SecretDefinitionReconciler{
+		Client:               mgr.GetClient(),
 		Backend:              *backendClient,
 		APIReader:            mgr.GetAPIReader(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("SecretDefinition"),
