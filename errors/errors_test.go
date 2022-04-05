@@ -15,8 +15,6 @@ func TestErrorString(t *testing.T) {
 	assert.EqualError(t, err2, fmt.Sprintf("[%s] secret key %s not found at %s", err2.ErrType, err2.Key, err2.Path))
 	err3 := &K8sSecretNotFoundError{ErrType: K8sSecretNotFoundErrorType, Name: "foo", Namespace: "bar"}
 	assert.EqualError(t, err3, fmt.Sprintf("[%s] secret '%s/%s' not found", err3.ErrType, err3.Namespace, err3.Name))
-	err4 := &InvalidConfigmapNameError{ErrType: InvalidConfigmapNameErrorType, Value: "foo"}
-	assert.EqualError(t, err4, fmt.Sprintf("[%s] invalid configmap name '%s'", err4.ErrType, err4.Value))
 	err5 := &EncodingNotImplementedError{ErrType: EncodingNotImplementedErrorType, Encoding: "foo"}
 	assert.EqualError(t, err5, fmt.Sprintf("[%s] encoding %s not supported", err5.ErrType, err5.Encoding))
 	err6 := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType, Engine: "foo"}
@@ -34,8 +32,6 @@ func TestGetErrorType(t *testing.T) {
 	assert.Equal(t, getErrorType(err3), BackendSecretNotFoundErrorType)
 	err4 := &K8sSecretNotFoundError{ErrType: K8sSecretNotFoundErrorType}
 	assert.Equal(t, getErrorType(err4), K8sSecretNotFoundErrorType)
-	err5 := &InvalidConfigmapNameError{ErrType: InvalidConfigmapNameErrorType}
-	assert.Equal(t, getErrorType(err5), InvalidConfigmapNameErrorType)
 	err6 := &EncodingNotImplementedError{ErrType: EncodingNotImplementedErrorType}
 	assert.Equal(t, getErrorType(err6), EncodingNotImplementedErrorType)
 	err7 := &VaultEngineNotImplementedError{ErrType: VaultEngineNotImplementedErrorType}
@@ -63,13 +59,6 @@ func TestIsK8sSecretNotFound(t *testing.T) {
 	assert.True(t, IsK8sSecretNotFound(err))
 	err2 := e.New("foo")
 	assert.False(t, IsK8sSecretNotFound(err2))
-}
-
-func TestIsInvalidConfigmapName(t *testing.T) {
-	err := &InvalidConfigmapNameError{ErrType: InvalidConfigmapNameErrorType}
-	assert.True(t, IsInvalidConfigmapName(err))
-	err2 := e.New("foo")
-	assert.False(t, IsInvalidConfigmapName(err2))
 }
 
 func TestIsEncodingNotImplemented(t *testing.T) {

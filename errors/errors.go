@@ -9,7 +9,6 @@ const (
 	BackendSecretNotFoundErrorType     = "BackendSecretNotFoundError"
 	BackendSecretForbiddenErrorType    = "BackendSecretForbiddenError"
 	K8sSecretNotFoundErrorType         = "K8sSecretNotFoundError"
-	InvalidConfigmapNameErrorType      = "InvalidConfigmapNameError"
 	EncodingNotImplementedErrorType    = "EncodingNotImplementedError"
 	VaultEngineNotImplementedErrorType = "VaultEngineNotImplementedError"
 	VaultTokenNotRenewableErrorType    = "VaultTokenNotRenewableError"
@@ -33,12 +32,6 @@ type K8sSecretNotFoundError struct {
 	ErrType   string
 	Name      string
 	Namespace string
-}
-
-// InvalidConfigmapNameError will be raised if the configmap name format is not correct
-type InvalidConfigmapNameError struct {
-	ErrType string
-	Value   string
 }
 
 // EncodingNotImplementedError will be raised if the selected encoding is not implemented
@@ -66,8 +59,6 @@ func getErrorType(err error) string {
 		return BackendSecretNotFoundErrorType
 	case *K8sSecretNotFoundError:
 		return K8sSecretNotFoundErrorType
-	case *InvalidConfigmapNameError:
-		return InvalidConfigmapNameErrorType
 	case *EncodingNotImplementedError:
 		return EncodingNotImplementedErrorType
 	case *VaultEngineNotImplementedError:
@@ -89,10 +80,6 @@ func (e BackendSecretNotFoundError) Error() string {
 
 func (e K8sSecretNotFoundError) Error() string {
 	return fmt.Sprintf("[%s] secret '%s/%s' not found", e.ErrType, e.Namespace, e.Name)
-}
-
-func (e InvalidConfigmapNameError) Error() string {
-	return fmt.Sprintf("[%s] invalid configmap name '%s'", e.ErrType, e.Value)
 }
 
 func (e EncodingNotImplementedError) Error() string {
@@ -120,11 +107,6 @@ func IsBackendSecretNotFound(err error) bool {
 // IsK8sSecretNotFound returns true if the error is type of K8sSecretNotFound and false otherwise
 func IsK8sSecretNotFound(err error) bool {
 	return getErrorType(err) == K8sSecretNotFoundErrorType
-}
-
-// IsInvalidConfigmapName returns true if the error is type of InvalidConfigmapName and false otherwise
-func IsInvalidConfigmapName(err error) bool {
-	return getErrorType(err) == InvalidConfigmapNameErrorType
 }
 
 // IsEncodingNotImplemented returns true if the error is type of EncodingNotImplementedError and false otherwise
