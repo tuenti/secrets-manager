@@ -38,20 +38,14 @@ func getAzureCredential(ctx context.Context, logger logr.Logger, cfg Config) (az
 
 		managed, err := azidentity.NewManagedIdentityCredential(&opts)
 		if err == nil {
-			logger.Info("Azure managed Identity will be used as authentication method")
+			logger.Info("Azure Managed Identity will be used as authentication method")
 			return managed, err
 		}
 	}
 
-	spEnv, err := azidentity.NewEnvironmentCredential(nil)
-	if err == nil {
-		logger.Info("Azure Service Principal with environment variables will be used as authentication method")
-		return spEnv, err
-	}
-
 	spSecret, err := azidentity.NewClientSecretCredential(cfg.AzureKVTenantID, cfg.AzureKVClientID, cfg.AzureKVClientSecret, nil)
 	if err == nil {
-		logger.Info("Azure Service Principal with explicit variables will be used as authentication method")
+		logger.Info("Azure Service Principal will be used as authentication method")
 		return spSecret, err
 	}
 
