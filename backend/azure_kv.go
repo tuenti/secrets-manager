@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -25,34 +26,44 @@ type azureKVClient struct {
 	logger       logr.Logger
 }
 
+// getAzureCredential finds the better way to authenticate to Azure
+func getAzureCredential(ctx context.Context, logger logr.Logger, cfg Config) (azcore.TokenCredential, error) {
+	if cfg.AzureKVManagedClientID != "" || cfg.AzureKVManagedResourceID != "" {
+		opts := azidentity.ManagedIdentityCredentialOptions{}
+		if cfg.AzureKVManagedClientID != "" {
+			opts.ID = azidentity.ClientID(cfg.AzureKVManagedClientID)
+		} else if cfg.AzureKVManagedResourceID != "" {
+			opts.ID = azidentity.ResourceID(cfg.AzureKVManagedResourceID)
+		}
+
+		managed, err := azidentity.NewManagedIdentityCredential(&opts)
+		if err == nil {
+			logger.Info("Azure managed Identity will be used as authentication method")
+			return managed, err
+		}
+	}
+
+	spEnv, err := azidentity.NewEnvironmentCredential(nil)
+	if err == nil {
+		logger.Info("Azure Service Principal with environment variables will be used as authentication method")
+		return spEnv, err
+	}
+
+	spSecret, err := azidentity.NewClientSecretCredential(cfg.AzureKVTenantID, cfg.AzureKVClientID, cfg.AzureKVClientSecret, nil)
+	if err == nil {
+		logger.Info("Azure Service Principal with explicit variables will be used as authentication method")
+		return spSecret, err
+	}
+
+	return nil, goerrors.New("Unable to authenticate to Azure API using any method")
+}
+
 func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azureKVClient, error) {
 	logger := l.WithName("azure-kv").WithValues(
 		"azure_kv_name", cfg.AzureKVName,
 		"azure_kv_tenant", cfg.AzureKVTenantID)
 
-	opts := azidentity.ManagedIdentityCredentialOptions{}
-	if cfg.AzureKVManagedClientID != "" {
-		opts.ID = azidentity.ClientID(cfg.AzureKVManagedClientID)
-	} else if cfg.AzureKVManagedResourceID != "" {
-		opts.ID = azidentity.ResourceID(cfg.AzureKVManagedResourceID)
-	}
-
-	managed, err := azidentity.NewManagedIdentityCredential(&opts)
-	if err != nil {
-		logger.Error(err, "Error occured while authenticating using Azure managed identity")
-	}
-
-	spEnv, err := azidentity.NewEnvironmentCredential(nil)
-	if err != nil {
-		logger.Error(err, "Error occured while authenticating using Azure Service Principal with environment variables")
-	}
-
-	spSecret, err := azidentity.NewClientSecretCredential(cfg.AzureKVTenantID, cfg.AzureKVClientID, cfg.AzureKVClientSecret, nil)
-	if err != nil {
-		logger.Error(err, "Error occured while authenticating using Azure Service Principal")
-	}
-
-	cred, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{managed, spEnv, spSecret}, nil)
+	cred, err := getAzureCredential(ctx, logger, cfg)
 	if err != nil {
 		logger.Error(err, "Error occured while authenticating to Azure")
 	}

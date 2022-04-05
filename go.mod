@@ -3,7 +3,7 @@ module github.com/tuenti/secrets-manager
 go 1.16
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.23.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.22.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v0.13.2
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.6.0
 	github.com/Azure/go-autorest/autorest v0.11.1

@@ -135,6 +135,20 @@ func main() {
 		backendCfg.AzureKVName = os.Getenv("AZURE_KV_NAME")
 	}
 
+	// Capture Azure SP Env auth method environment variables
+	// This will let inner code to authenticate using a mix of env and args
+	if os.Getenv("AZURE_TENANT_ID") != "" {
+		backendCfg.AzureKVTenantID = os.Getenv("AZURE_TENANT_ID")
+	}
+
+	if os.Getenv("AZURE_CLIENT_ID") != "" {
+		backendCfg.AzureKVClientID = os.Getenv("AZURE_CLIENT_ID")
+	}
+
+	if os.Getenv("AZURE_CLIENT_SECRET") != "" {
+		backendCfg.AzureKVClientSecret = os.Getenv("AZURE_CLIENT_SECRET")
+	}
+
 	if os.Getenv("AZURE_MANAGED_CLIENT_ID") != "" {
 		backendCfg.AzureKVManagedClientID = os.Getenv("AZURE_MANAGED_CLIENT_ID")
 	}
