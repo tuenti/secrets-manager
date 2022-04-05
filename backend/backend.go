@@ -8,8 +8,10 @@ import (
 	"github.com/tuenti/secrets-manager/errors"
 )
 
-const vaultBackendName = "vault"
-const azureKVBackendName = "azure-kv"
+const (
+	vaultBackendName   = "vault"
+	azureKVBackendName = "azure-kv"
+)
 
 var supportedBackends map[string]bool
 
@@ -22,22 +24,24 @@ func init() {
 
 // Config type represent backend config, and should include all backends config
 type Config struct {
-	BackendTimeout          time.Duration
-	VaultURL                string
-	VaultAuthMethod         string
-	VaultRoleID             string
-	VaultSecretID           string
-	VaultKubernetesRole     string
-	VaultMaxTokenTTL        int64
-	VaultTokenPollingPeriod time.Duration
-	VaultRenewTTLIncrement  int
-	VaultEngine             string
-	VaultApprolePath        string
-	VaultKubernetesPath     string
-	AzureKVName             string
-	AzureKVTenantID         string
-	AzureKVClientID         string
-	AzureKVClientSecret     string
+	BackendTimeout           time.Duration
+	VaultURL                 string
+	VaultAuthMethod          string
+	VaultRoleID              string
+	VaultSecretID            string
+	VaultKubernetesRole      string
+	VaultMaxTokenTTL         int64
+	VaultTokenPollingPeriod  time.Duration
+	VaultRenewTTLIncrement   int
+	VaultEngine              string
+	VaultApprolePath         string
+	VaultKubernetesPath      string
+	AzureKVName              string
+	AzureKVTenantID          string
+	AzureKVClientID          string
+	AzureKVClientSecret      string
+	AzureKVManagedClientID   string
+	AzureKVManagedResourceID string
 }
 
 // Client interface represent a backend client interface that should be implemented

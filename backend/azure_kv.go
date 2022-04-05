@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/keyvault/2016-10-01/keyvault"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/go-logr/logr"
 	"github.com/tuenti/secrets-manager/errors"
 )
@@ -18,11 +19,8 @@ const (
 )
 
 type azureKVClient struct {
-	client       *keyvault.BaseClient
+	client       *azsecrets.Client
 	keyvaultName string
-	tenantID     string
-	clientID     string
-	clientSecret string
 	context      context.Context
 	logger       logr.Logger
 }
@@ -32,32 +30,46 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 		"azure_kv_name", cfg.AzureKVName,
 		"azure_kv_tenant", cfg.AzureKVTenantID)
 
+	opts := azidentity.ManagedIdentityCredentialOptions{}
+	if cfg.AzureKVManagedClientID != "" {
+		opts.ID = azidentity.ClientID(cfg.AzureKVManagedClientID)
+	} else if cfg.AzureKVManagedResourceID != "" {
+		opts.ID = azidentity.ResourceID(cfg.AzureKVManagedResourceID)
+	}
+
+	managed, err := azidentity.NewManagedIdentityCredential(&opts)
+	if err != nil {
+		logger.Error(err, "Error occured while authenticating using Azure managed identity")
+	}
+
+	spEnv, err := azidentity.NewEnvironmentCredential(nil)
+	if err != nil {
+		logger.Error(err, "Error occured while authenticating using Azure Service Principal with environment variables")
+	}
+
+	spSecret, err := azidentity.NewClientSecretCredential(cfg.AzureKVTenantID, cfg.AzureKVClientID, cfg.AzureKVClientSecret, nil)
+	if err != nil {
+		logger.Error(err, "Error occured while authenticating using Azure Service Principal")
+	}
+
+	cred, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{managed, spEnv, spSecret}, nil)
+	if err != nil {
+		logger.Error(err, "Error occured while authenticating to Azure")
+	}
 	akvMetrics = newAzureKVMetrics(cfg.AzureKVName, cfg.AzureKVTenantID)
-	akvClient := keyvault.New()
-	clientCredentialConfig := auth.NewClientCredentialsConfig(cfg.AzureKVClientID, cfg.AzureKVClientSecret, cfg.AzureKVTenantID)
-
-	// From SDK NewClientCredentialsConfig generates a object to azure control plane
-	// (By default Resource is set to management.azure.net)
-	// There below line was added to access the azure data plane
-	// Which is required to access secrets in keyvault
-
-	clientCredentialConfig.Resource = fmt.Sprintf("https://%s", azureKVEndpoint)
-	authorizer, err := clientCredentialConfig.Authorizer()
+	vaultEndpoint := fmt.Sprintf("https://%s.%s", cfg.AzureKVName, azureKVEndpoint)
+	akvClient, err := azsecrets.NewClient(vaultEndpoint, cred, nil)
 
 	if err != nil {
-		logger.Error(err, "Error occured while creating azure KV authorizer")
+		logger.Error(err, "Error occured while creating Azure KV client")
 		akvMetrics.updateLoginErrorsTotalMetric()
 	}
-	akvClient.Authorizer = authorizer
 
 	logger.Info("successfully logged into Azure KeyVault")
 
 	client := azureKVClient{
-		client:       &akvClient,
+		client:       akvClient,
 		keyvaultName: cfg.AzureKVName,
-		tenantID:     cfg.AzureKVTenantID,
-		clientID:     cfg.AzureKVClientID,
-		clientSecret: cfg.AzureKVClientSecret,
 		context:      ctx,
 		logger:       logger,
 	}
@@ -67,10 +79,9 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 
 func (c *azureKVClient) ReadSecret(path string, key string) (string, error) {
 	data := ""
-	uri := fmt.Sprintf("https://%s.%s", c.keyvaultName, azureKVEndpoint)
 
 	// TODO: Add support for secret version?
-	result, err := c.client.GetSecret(c.context, uri, path, "")
+	result, err := c.client.GetSecret(c.context, path, nil)
 
 	if err != nil {
 		errorType := errors.UnknownErrorType
