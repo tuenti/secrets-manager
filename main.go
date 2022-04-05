@@ -96,9 +96,11 @@ func main() {
 	flag.StringVar(&backendCfg.VaultApprolePath, "vault.approle-path", "approle", "Vault approle login path")
 	flag.StringVar(&backendCfg.VaultKubernetesPath, "vault.kubernetes-path", "kubernetes", "Vault kubernetes login path")
 	flag.StringVar(&backendCfg.AzureKVName, "azure-kv.name", "", "Azure KeyVault name. AZURE_KV_NAME environment would take precedence")
-	flag.StringVar(&backendCfg.AzureKVTenantID, "azure-kv.tenant-id", "", "Azure KeyVault Tenant ID. AZURE_KV_TENANT_ID environment would take precedence")
-	flag.StringVar(&backendCfg.AzureKVClientID, "azure-kv.client-id", "", "Azure KeyVault ClientID used to authenticate. AZURE_KV_CLIENT_ID environment would take precedence")
-	flag.StringVar(&backendCfg.AzureKVClientSecret, "azure-kv.client-secret", "", "Azure KeyVault Client Secret used to authenticate. AZURE_KV_CLIENT_SECRET environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVTenantID, "azure-kv.tenant-id", "", "Azure KeyVault Tenant ID. AZURE_TENANT_ID environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVClientID, "azure-kv.client-id", "", "Azure KeyVault ClientID used to authenticate. AZURE_CLIENT_ID environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVClientSecret, "azure-kv.client-secret", "", "Azure KeyVault Client Secret used to authenticate. AZURE_CLIENT_SECRET environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVManagedClientID, "azure-kv.managed-client-id", "", "Azure KeyVault Client ID used to authenticate using managed identity. AZURE_MANAGED_CLIENT_ID environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVManagedResourceID, "azure-kv.managed-resource-id", "", "Azure KeyVault Resource ID used to authenticate using managed identity. AZURE_MANAGED_RESOURCE_ID environment would take precedence")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "", "Comma separated list of namespaces that secrets-manager will watch for SecretDefinitions. By default all namespaces are watched.")
 	flag.StringVar(&excludeNamespaces, "exclude-namespaces", "", "Comma separated list of namespaces that secrets-manager will not watch for SecretDefinitions. By default all namespaces are watched.")
 
@@ -133,16 +135,12 @@ func main() {
 		backendCfg.AzureKVName = os.Getenv("AZURE_KV_NAME")
 	}
 
-	if os.Getenv("AZURE_KV_TENANT_ID") != "" {
-		backendCfg.AzureKVTenantID = os.Getenv("AZURE_KV_TENANT_ID")
+	if os.Getenv("AZURE_MANAGED_CLIENT_ID") != "" {
+		backendCfg.AzureKVManagedClientID = os.Getenv("AZURE_MANAGED_CLIENT_ID")
 	}
 
-	if os.Getenv("AZURE_KV_CLIENT_ID") != "" {
-		backendCfg.AzureKVClientID = os.Getenv("AZURE_KV_CLIENT_ID")
-	}
-
-	if os.Getenv("AZURE_KV_CLIENT_SECRET") != "" {
-		backendCfg.AzureKVClientSecret = os.Getenv("AZURE_KV_CLIENT_SECRET")
+	if os.Getenv("AZURE_MANAGED_RESOURCE_ID") != "" {
+		backendCfg.AzureKVManagedResourceID = os.Getenv("AZURE_MANAGED_RESOURCE_ID")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
