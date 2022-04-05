@@ -64,7 +64,7 @@ func NewBackendClient(ctx context.Context, backend string, logger logr.Logger, c
 		client = vclient
 		err = verr
 	case azureKVBackendName:
-		akvclient, akverr := azureKeyVaultClient(logger, cfg)
+		akvclient, akverr := azureKeyVaultClient(ctx, logger, cfg)
 		if akverr != nil {
 			return nil, akverr
 		}

@@ -23,10 +23,11 @@ type azureKVClient struct {
 	tenantID     string
 	clientID     string
 	clientSecret string
+	context      context.Context
 	logger       logr.Logger
 }
 
-func azureKeyVaultClient(l logr.Logger, cfg Config) (*azureKVClient, error) {
+func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azureKVClient, error) {
 	logger := l.WithName("azure-kv").WithValues(
 		"azure_kv_name", cfg.AzureKVName,
 		"azure_kv_tenant", cfg.AzureKVTenantID)
@@ -57,6 +58,7 @@ func azureKeyVaultClient(l logr.Logger, cfg Config) (*azureKVClient, error) {
 		tenantID:     cfg.AzureKVTenantID,
 		clientID:     cfg.AzureKVClientID,
 		clientSecret: cfg.AzureKVClientSecret,
+		context:      ctx,
 		logger:       logger,
 	}
 
@@ -68,7 +70,7 @@ func (c *azureKVClient) ReadSecret(path string, key string) (string, error) {
 	uri := fmt.Sprintf("https://%s.%s", c.keyvaultName, azureKVEndpoint)
 
 	// TODO: Add support for secret version?
-	result, err := c.client.GetSecret(context.Background(), uri, path, "")
+	result, err := c.client.GetSecret(c.context, uri, path, "")
 
 	if err != nil {
 		errorType := errors.UnknownErrorType

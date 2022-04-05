@@ -43,7 +43,7 @@ ENTRYPOINT ["/secrets-manager"]
 FROM builder as dev
 
 ENV ENVTEST_ASSETS_DIR=testbin
-ENV ENVTEST_K8S_VERSION=1.17.9
+ENV ENVTEST_K8S_VERSION=1.19.2
 # kubebuilder needed to run tests in development environment
 RUN curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.1.0/kubebuilder_linux_amd64
 RUN mv kubebuilder_linux_amd64 kubebuilder \
