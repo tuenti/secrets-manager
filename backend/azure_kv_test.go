@@ -101,3 +101,10 @@ func TestGetAzureCredential(t *testing.T) {
 		}
 	}
 }
+
+func TestAzureKeyVaultClient(t *testing.T) {
+	cfg := Config{}
+	client, err := azureKeyVaultClient(context.TODO(), logger, cfg)
+	assert.NotNilf(t, err, "Empty config should generate an error")
+	assert.Nil(t, client, "Empty configu should not generate any client")
+}

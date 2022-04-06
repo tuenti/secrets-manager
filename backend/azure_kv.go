@@ -60,6 +60,7 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 	cred, err := getAzureCredential(ctx, logger, cfg)
 	if err != nil {
 		logger.Error(err, "Error occured while authenticating to Azure")
+		return nil, err
 	}
 	akvMetrics = newAzureKVMetrics(cfg.AzureKVName, cfg.AzureKVTenantID)
 	vaultEndpoint := fmt.Sprintf("https://%s.%s", cfg.AzureKVName, azureKVEndpoint)
