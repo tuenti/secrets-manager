@@ -99,8 +99,8 @@ func main() {
 	flag.StringVar(&backendCfg.AzureKVTenantID, "azure-kv.tenant-id", "", "Azure KeyVault Tenant ID. AZURE_TENANT_ID environment would take precedence")
 	flag.StringVar(&backendCfg.AzureKVClientID, "azure-kv.client-id", "", "Azure KeyVault ClientID used to authenticate. AZURE_CLIENT_ID environment would take precedence")
 	flag.StringVar(&backendCfg.AzureKVClientSecret, "azure-kv.client-secret", "", "Azure KeyVault Client Secret used to authenticate. AZURE_CLIENT_SECRET environment would take precedence")
-	flag.StringVar(&backendCfg.AzureKVManagedClientID, "azure-kv.managed-client-id", "", "Azure KeyVault Client ID used to authenticate using managed identity. AZURE_MANAGED_CLIENT_ID environment would take precedence")
-	flag.StringVar(&backendCfg.AzureKVManagedResourceID, "azure-kv.managed-resource-id", "", "Azure KeyVault Resource ID used to authenticate using managed identity. AZURE_MANAGED_RESOURCE_ID environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVManagedClientID, "azure-kv.managed-client-id", "", "Azure Managed Identity Client ID used to authenticate. AZURE_MANAGED_CLIENT_ID environment would take precedence")
+	flag.StringVar(&backendCfg.AzureKVManagedResourceID, "azure-kv.managed-resource-id", "", "Azure Managed Identity Resource ID used to authenticate. AZURE_MANAGED_RESOURCE_ID environment would take precedence")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "", "Comma separated list of namespaces that secrets-manager will watch for SecretDefinitions. By default all namespaces are watched.")
 	flag.StringVar(&excludeNamespaces, "exclude-namespaces", "", "Comma separated list of namespaces that secrets-manager will not watch for SecretDefinitions. By default all namespaces are watched.")
 

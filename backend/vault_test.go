@@ -5,20 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
-	"github.com/gorilla/mux"
 	"github.com/hashicorp/vault/api"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/tuenti/secrets-manager/errors"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -49,11 +43,7 @@ type testConfig struct {
 }
 
 var (
-	vaultCfg Config
-	server   *httptest.Server
-	mutex    sync.Mutex
-	testCfg  *testConfig
-	logger   logr.Logger
+	vaultTestCfg *testConfig
 )
 
 func v1SysHealth(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +73,7 @@ func v1SysHealth(w http.ResponseWriter, r *http.Request) {
 func v1AuthTokenLookupSelf(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := ""
-	if !testCfg.tokenRevoked {
+	if !vaultTestCfg.tokenRevoked {
 		jsonData = fmt.Sprintf(`
 		{
 			"request_id": "8d70f864-5f77-44fe-0940-df085376101f",
@@ -113,7 +103,7 @@ func v1AuthTokenLookupSelf(w http.ResponseWriter, r *http.Request) {
 			"wrap_info": null,
 			"warnings": null,
 			"auth": null
-		}`, testCfg.tokenRenewable, testCfg.tokenTTL)
+		}`, vaultTestCfg.tokenRenewable, vaultTestCfg.tokenTTL)
 	} else {
 		jsonData = `{"errors":["permission denied"]}`
 		w.WriteHeader(http.StatusForbidden)
@@ -130,7 +120,7 @@ func v1AuthTokenLookupSelf(w http.ResponseWriter, r *http.Request) {
 func v1AuthTokenRenewSelf(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := ""
-	if !testCfg.tokenRevoked {
+	if !vaultTestCfg.tokenRevoked {
 		jsonData = fmt.Sprintf(`
 		{
 			"request_id": "d8ae3e67-91a0-2f7a-528b-522048f9dad3",
@@ -170,7 +160,7 @@ func v1AuthTokenRenewSelf(w http.ResponseWriter, r *http.Request) {
 func v1AuthKubernetesLogin(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := ""
-	if !testCfg.invalidKubernetesRole {
+	if !vaultTestCfg.invalidKubernetesRole {
 		jsonData = fmt.Sprintf(`
 		{
   "auth": {
@@ -203,7 +193,7 @@ func v1AuthKubernetesLogin(w http.ResponseWriter, r *http.Request) {
 func v1AuthAppRoleLogin(w http.ResponseWriter, r *http.Request) {
 	var response interface{}
 	jsonData := ""
-	if !testCfg.invalidRoleID && !testCfg.invalidSecretID {
+	if !vaultTestCfg.invalidRoleID && !vaultTestCfg.invalidSecretID {
 		jsonData = fmt.Sprintf(`
 		{
   			"request_id": "ecc0025f-040a-3c28-164e-0651abd7f6ac",
@@ -235,7 +225,7 @@ func v1AuthAppRoleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 
 		}`, fakeToken)
-	} else if testCfg.invalidRoleID {
+	} else if vaultTestCfg.invalidRoleID {
 		jsonData = `{"errors":["invalid role ID"]}`
 		w.WriteHeader(http.StatusBadRequest)
 	} else {
@@ -306,7 +296,7 @@ func v1SecretTestKv1(w http.ResponseWriter, r *http.Request) {
 
 func TestVaultLoginKubernetes(t *testing.T) {
 	httpClient := new(http.Client)
-	vclient, _ := api.NewClient(&api.Config{Address: vaultCfg.VaultURL, HttpClient: httpClient})
+	vclient, _ := api.NewClient(&api.Config{Address: testingCfg.VaultURL, HttpClient: httpClient})
 	c := &client{
 		vclient:        vclient,
 		logical:        vclient.Logical(),
@@ -318,7 +308,7 @@ func TestVaultLoginKubernetes(t *testing.T) {
 	assert.Nil(t, err)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.invalidKubernetesRole = true
+	vaultTestCfg.invalidKubernetesRole = true
 	err2 := c.vaultKubernetesLogin(strings.NewReader(fakeKubernetesSAToken))
 	assert.NotNil(t, err2)
 }
@@ -336,7 +326,7 @@ func TestVaultBackendInvalidCfg(t *testing.T) {
 func TestVaultBackend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client, err := NewBackendClient(ctx, "vault", logger, vaultCfg)
+	client, err := NewBackendClient(ctx, "vault", logger, testingCfg)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
 }
@@ -344,27 +334,27 @@ func TestVaultBackend(t *testing.T) {
 func TestVaultLoginInvalidRoleId(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.invalidRoleID = true
-	client, err := vaultClient(logger, vaultCfg)
+	vaultTestCfg.invalidRoleID = true
+	client, err := vaultClient(logger, testingCfg)
 	assert.Nil(t, client)
 	assert.NotNil(t, err)
-	testCfg.invalidRoleID = defaultInvalidAppRole
+	vaultTestCfg.invalidRoleID = defaultInvalidAppRole
 }
 
 func TestVaultLoginInvalidSecretId(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.invalidSecretID = true
-	client, err := vaultClient(logger, vaultCfg)
+	vaultTestCfg.invalidSecretID = true
+	client, err := vaultClient(logger, testingCfg)
 	assert.Nil(t, client)
 	assert.NotNil(t, err)
-	testCfg.invalidSecretID = defaultInvalidAppRole
+	vaultTestCfg.invalidSecretID = defaultInvalidAppRole
 }
 
 func TestVaultClient(t *testing.T) {
 	maxTokenTTL.Reset()
-	client, err := vaultClient(logger, vaultCfg)
-	metricMaxTokenTTL, _ := maxTokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	client, err := vaultClient(logger, testingCfg)
+	metricMaxTokenTTL, _ := maxTokenTTL.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 	assert.Nil(t, err)
 	assert.NotNil(t, client)
 	assert.Equal(t, float64(client.maxTokenTTL), testutil.ToFloat64(metricMaxTokenTTL))
@@ -378,31 +368,31 @@ func TestVaultClientInvalidCfg(t *testing.T) {
 }
 
 func TestGetToken(t *testing.T) {
-	client, err := vaultClient(logger, vaultCfg)
+	client, err := vaultClient(logger, testingCfg)
 	token, err := client.getToken()
 	assert.NotNil(t, token)
 	assert.Nil(t, err)
 }
 
 func TestGetTokenTTL(t *testing.T) {
-	client, err := vaultClient(logger, vaultCfg)
+	client, err := vaultClient(logger, testingCfg)
 	tokenTTL.Reset()
 
 	token, err := client.getToken()
 	ttl, err := client.getTokenTTL(token)
-	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 
-	assert.Equal(t, float64(testCfg.tokenTTL), testutil.ToFloat64(metricTokenTTL))
-	assert.Equal(t, int64(testCfg.tokenTTL), ttl)
+	assert.Equal(t, float64(vaultTestCfg.tokenTTL), testutil.ToFloat64(metricTokenTTL))
+	assert.Equal(t, int64(vaultTestCfg.tokenTTL), ttl)
 	assert.Nil(t, err)
 }
 
 func TestRenewToken(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = true
-	testCfg.tokenTTL = 600
+	vaultTestCfg.tokenRenewable = true
+	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
 	token, err := client.getToken()
@@ -412,28 +402,28 @@ func TestRenewToken(t *testing.T) {
 }
 
 func TestRenewTokenRevokedToken(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = true
-	testCfg.tokenTTL = 600
+	vaultTestCfg.tokenRenewable = true
+	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
 	token, err := client.getToken()
-	testCfg.tokenRevoked = true
+	vaultTestCfg.tokenRevoked = true
 	tokenRenewalErrorsTotal.Reset()
 	err = client.renewToken(token)
-	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultRenewSelfOperationName, errors.UnknownErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultRenewSelfOperationName, errors.UnknownErrorType)
 	assert.NotNil(t, err)
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
 func TestTokenNotRenewableError(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = false
-	testCfg.tokenTTL = 600
+	vaultTestCfg.tokenRenewable = false
+	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
 	token, err := client.getToken()
@@ -441,76 +431,76 @@ func TestTokenNotRenewableError(t *testing.T) {
 	tokenRenewalErrorsTotal.Reset()
 	err = client.renewToken(token)
 
-	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 	assert.EqualError(t, err, fmt.Sprintf("[%s] vault token not renewable", errors.VaultTokenNotRenewableErrorType))
 }
 
 func TestRenewalLoopRevokedToken(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRevoked = true
+	vaultTestCfg.tokenRevoked = true
 	tokenRenewalErrorsTotal.Reset()
 	client.renewalLoop()
-	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultLookupSelfOperationName, errors.UnknownErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultLookupSelfOperationName, errors.UnknownErrorType)
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
 func TestRenewalLoopNotRenewableToken(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.tokenRenewable = false
-	testCfg.tokenRevoked = false
-	testCfg.tokenTTL = 600
+	vaultTestCfg.tokenRenewable = false
+	vaultTestCfg.tokenRevoked = false
+	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
 	tokenRenewalErrorsTotal.Reset()
 	client.renewalLoop()
-	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
+	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
 }
 
 func TestRenewalLoopInvalidRoleId(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.invalidRoleID = true
-	testCfg.tokenRevoked = true
+	vaultTestCfg.invalidRoleID = true
+	vaultTestCfg.tokenRevoked = true
 
 	tokenRenewalErrorsTotal.Reset()
 	loginErrorsTotal.Reset()
 	client.renewalLoop()
-	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(loginErrorsTotal))
-	testCfg.invalidRoleID = defaultInvalidAppRole
-	testCfg.tokenRevoked = defaultRevokedToken
+	vaultTestCfg.invalidRoleID = defaultInvalidAppRole
+	vaultTestCfg.tokenRevoked = defaultRevokedToken
 }
 
 func TestRenewalLoopInvalidSecretId(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	mutex.Lock()
 	defer mutex.Unlock()
-	testCfg.invalidSecretID = true
-	testCfg.tokenRevoked = true
+	vaultTestCfg.invalidSecretID = true
+	vaultTestCfg.tokenRevoked = true
 
 	tokenRenewalErrorsTotal.Reset()
 	loginErrorsTotal.Reset()
 	client.renewalLoop()
-	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
+	loginErrorsTotal, _ := loginErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(loginErrorsTotal))
-	testCfg.invalidSecretID = defaultInvalidAppRole
-	testCfg.tokenRevoked = defaultRevokedToken
+	vaultTestCfg.invalidSecretID = defaultInvalidAppRole
+	vaultTestCfg.tokenRevoked = defaultRevokedToken
 }
 
 func TestReadSecretKv2(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	secretValue, err := client.ReadSecret("/secret/data/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
@@ -519,60 +509,22 @@ func TestReadSecretKv2(t *testing.T) {
 func TestReadSecretKv1(t *testing.T) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	vaultCfg.VaultEngine = "kv1"
-	client, _ := vaultClient(logger, vaultCfg)
+	testingCfg.VaultEngine = "kv1"
+	client, _ := vaultClient(logger, testingCfg)
 	secretValue, err := client.ReadSecret("/secret/test", "foo")
 	assert.Nil(t, err)
 	assert.Equal(t, "bar", secretValue)
 }
 
 func TestSecretNotFound(t *testing.T) {
-	client, _ := vaultClient(logger, vaultCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	path := "/secret/data/test"
 	key := "foo2"
 	secretReadErrorsTotal.Reset()
 	secretValue, err := client.ReadSecret(path, key)
-	metricSecretReadErrorsTotal, _ := secretReadErrorsTotal.GetMetricWithLabelValues(vaultCfg.VaultURL, vaultCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
+	metricSecretReadErrorsTotal, _ := secretReadErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, path, key, errors.BackendSecretNotFoundErrorType)
 
 	assert.Empty(t, secretValue)
 	assert.EqualError(t, err, fmt.Sprintf("[%s] secret key %s not found at %s", errors.BackendSecretNotFoundErrorType, key, path))
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricSecretReadErrorsTotal))
-}
-func TestMain(m *testing.M) {
-	r := mux.NewRouter()
-	v1SysHandler := r.PathPrefix(fmt.Sprintf("/%s/sys", vaultAPIVersion)).Subrouter()
-	v1AuthHandler := r.PathPrefix(fmt.Sprintf("/%s/auth", vaultAPIVersion)).Subrouter()
-	v1SecretHandler := r.PathPrefix(fmt.Sprintf("/%s/secret", vaultAPIVersion)).Subrouter()
-
-	v1SysHandler.HandleFunc("/health", v1SysHealth).Methods("GET")
-	v1AuthHandler.HandleFunc("/token/lookup-self", v1AuthTokenLookupSelf).Methods("GET")
-	v1AuthHandler.HandleFunc("/token/renew-self", v1AuthTokenRenewSelf).Methods("PUT")
-	v1AuthHandler.HandleFunc("/approle/login", v1AuthAppRoleLogin).Methods("PUT")
-	v1AuthHandler.HandleFunc("/kubernetes/login", v1AuthKubernetesLogin).Methods("PUT")
-	v1SecretHandler.HandleFunc("/data/test", v1SecretTestKv2).Methods("GET")
-	v1SecretHandler.HandleFunc("/test", v1SecretTestKv1).Methods("GET")
-
-	server = httptest.NewServer(r)
-	defer server.Close()
-
-	vaultCfg = Config{
-		VaultURL:                string(server.URL),
-		VaultRoleID:             vaultFakeRoleID,
-		VaultSecretID:           vaultFakeSecretID,
-		VaultTokenPollingPeriod: 1,
-		VaultEngine:             "kv2",
-		VaultApprolePath:        vaultAppRolePath,
-	}
-
-	testCfg = &testConfig{
-		tokenRenewable:  defaultTokenRenewable,
-		tokenTTL:        defaultTokenTTL,
-		tokenRevoked:    defaultRevokedToken,
-		invalidRoleID:   defaultInvalidAppRole,
-		invalidSecretID: defaultInvalidAppRole,
-	}
-
-	logger = zap.New(zap.UseDevMode(true))
-
-	os.Exit(m.Run())
 }

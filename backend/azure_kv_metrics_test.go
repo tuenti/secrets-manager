@@ -8,11 +8,6 @@ import (
 	"github.com/tuenti/secrets-manager/errors"
 )
 
-const (
-	fakeKeyVaultName   = "azure-keyvault-fake-name"
-	fakeKeyVaultTenant = "01234567-0123-0123-0123-0123456789ab"
-)
-
 func TestAzureKVUpdateLoginErrorsTotal(t *testing.T) {
 	metrics := newAzureKVMetrics(fakeKeyVaultName, fakeKeyVaultTenant)
 	azureKVLoginErrorsTotal.Reset()

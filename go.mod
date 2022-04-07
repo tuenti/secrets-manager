@@ -6,7 +6,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.22.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v0.13.2
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.6.0
-	github.com/Azure/go-autorest/autorest v0.11.1
 	github.com/Azure/go-autorest/autorest/adal v0.9.18 // indirect
 	github.com/go-logr/logr v0.3.0
 	github.com/gorilla/mux v1.7.4

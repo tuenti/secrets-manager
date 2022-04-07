@@ -81,7 +81,7 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `azure-kv.tenant-id` | `""` | Azure KeyVault Tenant ID. `AZURE_TENANT_ID` environment would take precedence |
 | `azure-kv.client-id` | `""` | Azure KeyVault Cliend ID used to authenticate. `AZURE_CLIENT_ID` environment would take precedence |
 | `azure-kv.client-secret` | `""` | Azure KeyVault Client Secret used to authenticate. `AZURE_CLIENT_SECRET` environment would take precedence |
-| `azure-kv.managed-client-id` | `""` | Azure Managed Identity Resource ID used to authenticate. `AZURE_MANAGED_CLIENT_ID` environment would take precedence |
+| `azure-kv.managed-client-id` | `""` | Azure Managed Identity Client ID used to authenticate. `AZURE_MANAGED_CLIENT_ID` environment would take precedence |
 | `azure-kv.managed-resource-id` | `""` | Azure Managed Identity Resource ID used to authenticate. `AZURE_MANAGED_RESOURCE_ID` environment would take precedence |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |

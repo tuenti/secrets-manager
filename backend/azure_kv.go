@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/go-logr/logr"
 	"github.com/tuenti/secrets-manager/errors"
 )
@@ -69,6 +68,7 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 	if err != nil {
 		logger.Error(err, "Error occured while creating Azure KV client")
 		akvMetrics.updateLoginErrorsTotalMetric()
+		return nil, err
 	}
 
 	logger.Info("successfully logged into Azure KeyVault")
@@ -91,11 +91,12 @@ func (c *azureKVClient) ReadSecret(path string, key string) (string, error) {
 
 	if err != nil {
 		errorType := errors.UnknownErrorType
-		if v, ok := err.(autorest.DetailedError); ok {
-			if v.StatusCode == 404 {
+		var responseError *azcore.ResponseError
+		if goerrors.As(err, &responseError) {
+			if responseError.StatusCode == 404 {
 				errorType = errors.BackendSecretNotFoundErrorType
 			}
-			if v.StatusCode == 403 {
+			if responseError.StatusCode == 403 {
 				errorType = errors.BackendSecretForbiddenErrorType
 			}
 		}
