@@ -78,9 +78,11 @@ To deploy it just run `kubectl apply -f secretdefinition-sample.yaml`
 | `reconcile-period`| 5s | How often the controller will re-queue secretdefinition events |
 | `config.backend-timeout`| 5s | Backend connection timeout |
 | `azure-kv.name` | `""` | Azure KeyVault name. `AZURE_KV_NAME` environment would take precedence |
-| `azure-kv.tenant-id` | `""` | Azure KeyVault Tenant ID. `AZURE_KV_TENANT_ID` environment would take precedence |
-| `azure-kv.client-id` | `""` | Azure KeyVault Cliend ID used to authenticate. `AZURE_KV_CLIENT_ID` environment would take precedence |
-| `azure-kv.client-secret` | `""` | Azure KeyVault Client Secret used to authenticate. `AZURE_KV_CLIENT_SECRET` environment would take precedence |
+| `azure-kv.tenant-id` | `""` | Azure KeyVault Tenant ID. `AZURE_TENANT_ID` environment would take precedence |
+| `azure-kv.client-id` | `""` | Azure KeyVault Cliend ID used to authenticate. `AZURE_CLIENT_ID` environment would take precedence |
+| `azure-kv.client-secret` | `""` | Azure KeyVault Client Secret used to authenticate. `AZURE_CLIENT_SECRET` environment would take precedence |
+| `azure-kv.managed-client-id` | `""` | Azure Managed Identity Resource ID used to authenticate. `AZURE_MANAGED_CLIENT_ID` environment would take precedence |
+| `azure-kv.managed-resource-id` | `""` | Azure Managed Identity Resource ID used to authenticate. `AZURE_MANAGED_RESOURCE_ID` environment would take precedence |
 | `vault.url` | https://127.0.0.1:8200 | Vault address. `VAULT_ADDR` environment would take precedence. |
 | `vault.role-id` | `""` | Vault appRole `role_id`. `VAULT_ROLE_ID` environment would take precedence. |
 | `vault.secret-id` | `""` | Vault appRole `secret_id`. `VAULT_SECRET_ID` environment would take precedence. |
@@ -202,6 +204,15 @@ If you haven't still deployed an Azure KeyVault server, you can do it with Azure
 ```
 $ az keyvault create --location <location> --name <keyvault_name> --resource-group <resource_group>
 ```
+
+### Azure authentication methods
+
+Secrets manager currently supports the following authentication methods for Azure:
+- [*Azure Managed Identity*](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview).
+ This is the preferred method if secrets manager is running in an Azure VM or Azure Kubernetes Service (AKS) cluster.
+ For further information about how to use managed identities in Azure Kubernetes Service (AKS) see [documentation](https://docs.microsoft.com/en-us/azure/aks/use-managed-identity).
+- [*Azure Service Principal*](https://docs.microsoft.com/en-us/azure/active-directory/develop/app-objects-and-service-principals).
+ This method can be used if secrets manager runs outside of Azure service, although it requires more configuration steps.
 
 ### Create a Service Principal to access secrets
 
