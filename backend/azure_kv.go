@@ -58,7 +58,7 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 
 	cred, err := getAzureCredential(ctx, logger, cfg)
 	if err != nil {
-		logger.Error(err, "Error occured while authenticating to Azure")
+		logger.Error(err, "Error while authenticating to Azure")
 		return nil, err
 	}
 	akvMetrics = newAzureKVMetrics(cfg.AzureKVName, cfg.AzureKVTenantID)
@@ -66,12 +66,12 @@ func azureKeyVaultClient(ctx context.Context, l logr.Logger, cfg Config) (*azure
 	akvClient, err := azsecrets.NewClient(vaultEndpoint, cred, nil)
 
 	if err != nil {
-		logger.Error(err, "Error occured while creating Azure KV client")
+		logger.Error(err, "Error while creating Azure KV client")
 		akvMetrics.updateLoginErrorsTotalMetric()
 		return nil, err
 	}
 
-	logger.Info("successfully logged into Azure KeyVault")
+	logger.Info("Successfully logged into Azure KeyVault")
 
 	client := azureKVClient{
 		client:       akvClient,
