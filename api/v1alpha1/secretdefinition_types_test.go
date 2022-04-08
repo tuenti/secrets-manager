@@ -41,7 +41,7 @@ var _ = Describe("SecretDefinition", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	// Add Tests for OpenAPI validation (or additonal CRD features) specified in
+	// Add Tests for OpenAPI validation (or additional CRD features) specified in
 	// your API definition.
 	// Avoid adding tests for vanilla CRUD operations because they would
 	// test Kubernetes API server, which isn't the goal here.
@@ -62,7 +62,7 @@ var _ = Describe("SecretDefinition", func() {
 					Name: "foo",
 					Type: "Opaque",
 					KeysMap: map[string]DataSource{
-						"foo": DataSource{
+						"foo": {
 							Path:     "secret/supersecret1",
 							Key:      "foo",
 							Encoding: "text",

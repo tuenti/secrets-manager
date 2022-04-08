@@ -8,28 +8,40 @@ import (
 	"github.com/tuenti/secrets-manager/errors"
 )
 
-const vaultBackendName = "vault"
+const (
+	vaultBackendName   = "vault"
+	azureKVBackendName = "azure-kv"
+)
 
 var supportedBackends map[string]bool
 
 func init() {
-	supportedBackends = map[string]bool{vaultBackendName: true}
+	supportedBackends = map[string]bool{
+		vaultBackendName:   true,
+		azureKVBackendName: true,
+	}
 }
 
 // Config type represent backend config, and should include all backends config
 type Config struct {
-	BackendTimeout          time.Duration
-	VaultURL                string
-	VaultAuthMethod         string
-	VaultRoleID             string
-	VaultSecretID           string
-	VaultKubernetesRole     string
-	VaultMaxTokenTTL        int64
-	VaultTokenPollingPeriod time.Duration
-	VaultRenewTTLIncrement  int
-	VaultEngine             string
-	VaultApprolePath        string
-	VaultKubernetesPath     string
+	BackendTimeout           time.Duration
+	VaultURL                 string
+	VaultAuthMethod          string
+	VaultRoleID              string
+	VaultSecretID            string
+	VaultKubernetesRole      string
+	VaultMaxTokenTTL         int64
+	VaultTokenPollingPeriod  time.Duration
+	VaultRenewTTLIncrement   int
+	VaultEngine              string
+	VaultApprolePath         string
+	VaultKubernetesPath      string
+	AzureKVName              string
+	AzureKVTenantID          string
+	AzureKVClientID          string
+	AzureKVClientSecret      string
+	AzureKVManagedClientID   string
+	AzureKVManagedResourceID string
 }
 
 // Client interface represent a backend client interface that should be implemented
@@ -55,6 +67,13 @@ func NewBackendClient(ctx context.Context, backend string, logger logr.Logger, c
 		vclient.startTokenRenewer(ctx)
 		client = vclient
 		err = verr
+	case azureKVBackendName:
+		akvclient, akverr := azureKeyVaultClient(ctx, logger, cfg)
+		if akverr != nil {
+			return nil, akverr
+		}
+		client = akvclient
+		err = akverr
 	}
 	return &client, err
 }

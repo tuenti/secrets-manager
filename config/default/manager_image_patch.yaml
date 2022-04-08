@@ -8,5 +8,5 @@ spec:
     spec:
       containers:
       # Change the value of image field below to your controller image URL
-      - image: registry.hub.docker.com/tuentitech/secrets-manager:v2.0.1
+      - image: registry.hub.docker.com/tuentitech/secrets-manager:v2.1.0
         name: manager
