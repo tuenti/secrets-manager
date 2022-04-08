@@ -396,7 +396,7 @@ func TestRenewToken(t *testing.T) {
 	client.maxTokenTTL = 6000
 
 	token, _ := client.getToken()
-	err = client.renewToken(token)
+	err := client.renewToken(token)
 
 	assert.Nil(t, err)
 }

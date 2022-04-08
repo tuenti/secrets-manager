@@ -62,7 +62,7 @@ var _ = Describe("SecretDefinition", func() {
 					Name: "foo",
 					Type: "Opaque",
 					KeysMap: map[string]DataSource{
-						"foo": DataSource{
+						"foo": {
 							Path:     "secret/supersecret1",
 							Key:      "foo",
 							Encoding: "text",
