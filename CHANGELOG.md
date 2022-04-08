@@ -96,7 +96,7 @@ Stable
 
 ### Added
 - New `secrets_manager_vault_max_token_ttl` metric, so a user could alert based on this and `secrets_manager_token_ttl`
-- New `secrets_manager_secret_last_sync_status` metric, that shows wether the secret succeded or not in last synchronization iteration
+- New `secrets_manager_secret_last_sync_status` metric, that shows wether the secret succeeded or not in last synchronization iteration
 
 ### Fixed
 - Backend timeout not properly set through flags

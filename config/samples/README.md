@@ -28,4 +28,4 @@ This will create the policy, the role and a kubernetes secret containing role_id
 
 `kubectl apply -f secrets-manager.yaml`
 
-*NOTE*: You have a `SecretDefinition` exmaple there too to play with it: `secretsmanager_v1alpha1_secretdefinition.yaml`
+*NOTE*: You have a `SecretDefinition` example there too to play with it: `secretsmanager_v1alpha1_secretdefinition.yaml`

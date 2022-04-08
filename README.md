@@ -220,7 +220,7 @@ Secrets manager currently supports the following authentication methods for Azur
 to use an isolated Service Principal to limit its access to the least required resources:
 
 ```
-$ az ad sp create-for-rbac --name "<service_priciple_name>" --role Contributor --scopes /subscriptions/{SubID}/resourceGroups/{ResourceGroup}
+$ az ad sp create-for-rbac --name "<service_principal_name>" --role Contributor --scopes /subscriptions/{SubID}/resourceGroups/{ResourceGroup}
 ```
 
 This command will output a JSON object like the following:
