@@ -368,17 +368,17 @@ func TestVaultClientInvalidCfg(t *testing.T) {
 }
 
 func TestGetToken(t *testing.T) {
-	client, err := vaultClient(logger, testingCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	token, err := client.getToken()
 	assert.NotNil(t, token)
 	assert.Nil(t, err)
 }
 
 func TestGetTokenTTL(t *testing.T) {
-	client, err := vaultClient(logger, testingCfg)
+	client, _ := vaultClient(logger, testingCfg)
 	tokenTTL.Reset()
 
-	token, err := client.getToken()
+	token, _ := client.getToken()
 	ttl, err := client.getTokenTTL(token)
 	metricTokenTTL, _ := tokenTTL.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName)
 
@@ -395,7 +395,7 @@ func TestRenewToken(t *testing.T) {
 	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
-	token, err := client.getToken()
+	token, _ := client.getToken()
 	err = client.renewToken(token)
 
 	assert.Nil(t, err)
@@ -409,10 +409,10 @@ func TestRenewTokenRevokedToken(t *testing.T) {
 	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
-	token, err := client.getToken()
+	token, _ := client.getToken()
 	vaultTestCfg.tokenRevoked = true
 	tokenRenewalErrorsTotal.Reset()
-	err = client.renewToken(token)
+	err := client.renewToken(token)
 	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultRenewSelfOperationName, errors.UnknownErrorType)
 	assert.NotNil(t, err)
 	assert.Equal(t, 1.0, testutil.ToFloat64(metricTokenRenewalErrorsTotal))
@@ -426,10 +426,10 @@ func TestTokenNotRenewableError(t *testing.T) {
 	vaultTestCfg.tokenTTL = 600
 	client.maxTokenTTL = 6000
 
-	token, err := client.getToken()
+	token, _ := client.getToken()
 
 	tokenRenewalErrorsTotal.Reset()
-	err = client.renewToken(token)
+	err := client.renewToken(token)
 
 	metricTokenRenewalErrorsTotal, _ := tokenRenewalErrorsTotal.GetMetricWithLabelValues(testingCfg.VaultURL, testingCfg.VaultEngine, vaultFakeVersion, vaultFakeClusterID, vaultFakeClusterName, vaultIsRenewableOperationName, errors.VaultTokenNotRenewableErrorType)
 

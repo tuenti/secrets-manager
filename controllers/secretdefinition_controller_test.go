@@ -291,7 +291,7 @@ var _ = Describe("SecretsManager", func() {
 
 			// when:
 			err4 := r.Delete(ctx, secretdefinition)
-			res, err5 := r.Reconcile(ctx, reconcile.Request{
+			_, err5 := r.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: secretdefinition.Namespace,
 					Name:      secretdefinition.Name,
