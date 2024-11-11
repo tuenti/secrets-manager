@@ -64,7 +64,7 @@ test: manifests generate fmt vet ## Run tests.
 build: generate fmt vet ## Build manager binary.
 	go build ${BUILD_FLAGS} -o bin/${BINARY_NAME} main.go
 
-run: manifests generate ## Run a controller from your host.
+run: manifests generate fmt vet## Run a controller from your host.
 	go run ./main.go
 
 # Run tests in docker
