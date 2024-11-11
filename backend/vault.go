@@ -36,6 +36,7 @@ type client struct {
 	tokenPollingPeriod time.Duration
 	renewTTLIncrement  int
 	engine             engine
+	vaultEngine        string
 	approlePath        string
 	kubernetesPath     string
 	logger             logr.Logger
@@ -105,6 +106,7 @@ func vaultClient(l logr.Logger, cfg Config) (*client, error) {
 	logical := vclient.Logical()
 
 	engine, err := newEngine(cfg.VaultEngine)
+	logger.Info("Set engine to:", "engine", cfg.VaultEngine)
 	if err != nil {
 		logger.Error(err, "unable to setup vault engine")
 		return nil, err
@@ -121,6 +123,7 @@ func vaultClient(l logr.Logger, cfg Config) (*client, error) {
 		tokenPollingPeriod: cfg.VaultTokenPollingPeriod,
 		renewTTLIncrement:  cfg.VaultRenewTTLIncrement,
 		engine:             engine,
+		vaultEngine:        cfg.VaultEngine,
 		approlePath:        cfg.VaultApprolePath,
 		kubernetesPath:     cfg.VaultKubernetesPath,
 	}
@@ -248,7 +251,12 @@ func (c *client) ReadSecret(path string, key string) (string, error) {
 	}
 
 	logical := c.logical
+	if c.vaultEngine == "kv2" {
+		path = "secret/data" + path[6:]
+	}
+
 	secret, err := logical.Read(path)
+
 	if err != nil {
 		vMetrics.updateVaultSecretReadErrorsTotalMetric(path, key, errors.UnknownErrorType)
 		return data, err
