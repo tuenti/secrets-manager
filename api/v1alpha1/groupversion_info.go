@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the secretsmanager v1alpha1 API group
-//+kubebuilder:object:generate=true
-//+groupName=secrets-manager.tuenti.io
+// +kubebuilder:object:generate=true
+// +groupName=secrets-manager.tuenti.io
 package v1alpha1
 
 import (
